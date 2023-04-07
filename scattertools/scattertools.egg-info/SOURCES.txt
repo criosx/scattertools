@@ -1,0 +1,12 @@
+LICENSE
+setup.py
+scattertools/infotheory/GMM.py
+scattertools/infotheory/MVN.py
+scattertools/infotheory/__init__.py
+scattertools/infotheory/entropy.py
+scattertools/ml/__init__.py
+scattertools/ml/playground.py
+scattertools/scattertools.egg-info/PKG-INFO
+scattertools/scattertools.egg-info/SOURCES.txt
+scattertools/scattertools.egg-info/dependency_links.txt
+scattertools/scattertools.egg-info/top_level.txt
