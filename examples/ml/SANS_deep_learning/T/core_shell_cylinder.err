@@ -1,0 +1,50 @@
+.background = 0.0005
+.length = 33.9551 in [10,200]
+.length_pd = 0
+.length_pd_n = 35
+.length_pd_nsigma = 3
+.phi = 60
+.phi_pd = 0
+.phi_pd_n = 35
+.phi_pd_nsigma = 3
+.radius = 11.9769 in [10,200]
+.radius_pd = 0
+.radius_pd_n = 35
+.radius_pd_nsigma = 3
+.scale = 0.0811648 in [0.001,1]
+.sld_core = 2.15617 in [-1,7]
+.sld_core_M0 = 0
+.sld_core_mphi = 0
+.sld_core_mtheta = 0
+.sld_shell = 4.3233 in [-1,7]
+.sld_shell_M0 = 0
+.sld_shell_mphi = 0
+.sld_shell_mtheta = 0
+.sld_solvent = 4.33267 in [-0.6,6.4]
+.sld_solvent_M0 = 0
+.sld_solvent_mphi = 0
+.sld_solvent_mtheta = 0
+.theta = 60
+.theta_pd = 0
+.theta_pd_n = 35
+.theta_pd_nsigma = 3
+.thickness = 22.4835 in [10,200]
+.thickness_pd = 0
+.thickness_pd_n = 35
+.thickness_pd_nsigma = 3
+.up_frac_f = 0
+.up_frac_i = 0
+.up_phi = 0
+.up_theta = 90
+
+[chisq=1.276(83), nllf=62.5274]
+              Parameter       mean  median    best [   68% interval] [   95% interval]
+ 1               length     65(59)    35.4    34.0 [     14     153] [     11     195]
+ 2               radius     66(66)    25.1    12.0 [     14     157] [     11     198]
+ 3                scale   0.24(27)   0.125   0.081 [   0.02    0.51] [   0.00    0.93]
+ 4             sld_core    3.3(23)   3.032   2.156 [   0.79    6.34] [  -0.64    6.83]
+ 5            sld_shell    2.7(21)   2.988   4.323 [   0.29    4.75] [  -0.51    6.41]
+ 6          sld_solvent    2.7(20)   2.753   4.333 [   0.50    4.75] [  -0.38    6.19]
+ 7            thickness     41(36)    26.4    22.5 [     15      63] [     11     159]
+
+Statistics and plots based on 34237 samples (100.0% of total samples drawn)
