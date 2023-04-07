@@ -1,9 +1,7 @@
 Metadata-Version: 2.1
 Name: scattertools
 Version: 0.9
-Summary: Data analysis, experimental optimization, and machine learning for neutron and x-ray scattering.
-Home-page: https://github.com/criosx/scattertools
+Home-page: 
 Author: Frank Heinrich
 Author-email: mail@frank-heinrich.net
-License: GNU GENERAL PUBLIC LICENSE
 License-File: LICENSE

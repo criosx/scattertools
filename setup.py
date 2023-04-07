@@ -1,9 +1,9 @@
-from setuptools import setup
+import setuptools
 
-setup(
+setuptools.setup(
     name='scattertools',
     version='0.9',
-    packages=['scattertools.infotheory', 'scattertools.ml', 'scattertools.support'],
+    packages=["scattertools", "scattertools/ml", "scattertools/support", "scattertools/infotheory"],
     url='https://github.com/criosx/scattertools',
     license='GNU GENERAL PUBLIC LICENSE',
     author='Frank Heinrich',

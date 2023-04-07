@@ -1,1 +1,4 @@
 scattertools
+scattertools/infotheory
+scattertools/ml
+scattertools/support
