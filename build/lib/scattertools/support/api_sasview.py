@@ -13,7 +13,6 @@ import numpy.random
 import sasmodels.data
 import bumps.curve
 
-from scattertools.support import general
 from scattertools.support import api_bumps
 
 

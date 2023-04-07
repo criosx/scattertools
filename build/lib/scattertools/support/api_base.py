@@ -1,13 +1,9 @@
 from __future__ import print_function
 from os import path
 from random import seed, normalvariate, random
-from sys import exit, stdout
+from sys import exit
 
-import os
 import pandas
-import pathlib
-
-from scattertools.support import general
 
 
 class CBaseAPI:

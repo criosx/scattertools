@@ -13,7 +13,7 @@ import numpy.random
 import sasmodels.data
 import bumps.curve
 
-from scattertools.support import general
+import scattertools
 from scattertools.support import api_bumps
 
 
@@ -64,7 +64,7 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
         def _save(stem, suffix, frame, comment):
             frame.to_csv(os.path.join(self.spath, stem + suffix), sep=' ', index=None)
             if comment:
-                general.add_comments_to_start_of_file(os.path.join(self.spath, stem + suffix), comment)
+                scattertools.add_comments_to_start_of_file(os.path.join(self.spath, stem + suffix), comment)
 
         stem = pathlib.Path(basefilename).stem
         suffix = pathlib.Path(basefilename).suffix

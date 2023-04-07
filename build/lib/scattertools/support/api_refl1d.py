@@ -2,11 +2,10 @@ from __future__ import print_function
 from math import fabs, pow, sqrt
 import pathlib
 from random import normalvariate
-from re import VERBOSE, IGNORECASE, compile
 import pandas
 import os
 
-from scattertools.support import general
+import scattertools
 from scattertools.support import api_bumps
 
 
@@ -25,7 +24,7 @@ class CRefl1DAPI(api_bumps.CBumpsAPI):
         basestem{i}.basesuffix, whereby 'i' is an index from 0 to n-1.
         """
         def _load(stem, suffix):
-            comments = general.extract_comments_from_file(os.path.join(self.spath, stem + suffix), "#")
+            comments = scattertools.extract_comments_from_file(os.path.join(self.spath, stem + suffix), "#")
             data = pandas.read_csv(os.path.join(self.spath, stem + suffix), sep='\s+', skip_blank_lines=True,
                                    comment='#', header=None)
             # if there was a header move it from first row to header
@@ -70,7 +69,7 @@ class CRefl1DAPI(api_bumps.CBumpsAPI):
         """
         def _save(stem, suffix, frame, comment):
             frame.to_csv(os.path.join(self.spath, stem + suffix), sep=' ', index=None, header=None)
-            general.add_comments_to_start_of_file(os.path.join(self.spath, stem + suffix), comment)
+            scattertools.add_comments_to_start_of_file(os.path.join(self.spath, stem + suffix), comment)
 
         stem = pathlib.Path(basefilename).stem
         suffix = pathlib.Path(basefilename).suffix

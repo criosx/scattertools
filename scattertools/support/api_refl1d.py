@@ -2,11 +2,9 @@ from __future__ import print_function
 from math import fabs, pow, sqrt
 import pathlib
 from random import normalvariate
-from re import VERBOSE, IGNORECASE, compile
 import pandas
 import os
 
-from scattertools.support import general
 from scattertools.support import api_bumps
 
 
