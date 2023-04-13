@@ -1,4 +1,5 @@
 # This Python file uses the following encoding: utf-8
+# This Python file uses the following encoding: utf-8
 
 import numpy
 import os
@@ -254,7 +255,6 @@ class Widget(QWidget):
 
 
 if __name__ == "__main__":
-    print(sys.argv)
     app = QApplication(sys.argv)
     widget = Widget()
     widget.show()
