@@ -5,8 +5,8 @@ from random import normalvariate
 import pandas
 import os
 
-import scattertools
 from scattertools.support import api_bumps
+import scattertools
 
 
 # Refl1D methods will be used if a storage directory for a Markov Chain Monte Carlo (MCMC)

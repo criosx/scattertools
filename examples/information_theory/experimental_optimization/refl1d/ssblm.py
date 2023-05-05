@@ -67,7 +67,7 @@ silicon = SLD(name='silicon', rho=2.0690, irho=0.0000)
 
 layer_d2o = Slab(material=d2o, thickness=0.0000, interface=5.0000)
 layer_h2o = Slab(material=h2o, thickness=0.0000, interface=5.0000)
-layer_tiox = Slab(material=tiox, thickness=l_tiox - (blm.substrate.z + 0.5 * blm.substrate.l), interface=0.0)
+layer_tiox = Slab(material=tiox, thickness=l_tiox - (blm.substrate.z + 0.5 * blm.substrate.length), interface=0.0)
 layer_siox = Slab(material=siox, thickness=7.5804, interface=10.000)
 layer_silicon = Slab(material=silicon, thickness=0.0000, interface=0.0000)
 

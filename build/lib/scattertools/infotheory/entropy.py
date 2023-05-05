@@ -18,8 +18,8 @@ from IPython.display import clear_output
 from gpcam.autonomous_experimenter import AutonomousExperimenterGP
 
 from scattertools.support import molstat
-from scattertools import MVN
-import infotheory.GMM
+from scattertools.infotheory import MVN
+from scattertools.infotheory import GMM
 
 
 # static methods
