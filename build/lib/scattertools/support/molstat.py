@@ -410,30 +410,31 @@ class CMolStat:
                 # Recreate Molgroups and Derived Results
                 self.diMolgroups, self.diResults = self.Interactor.fnLoadMolgroups(problem)
 
-                # Store Molgroups
-                # self.diStatResults['Molgroups'].append(self.diMolgroups)
-                for name in self.diMolgroups:
-                    if name not in self.diStatResults['Molgroups']:
-                        self.diStatResults['Molgroups'][name] = {}
-                    for entry in self.diMolgroups[name]:
-                        if entry == 'zaxis':
-                            # store z-axis only once
-                            if entry not in self.diStatResults['Molgroups'][name]:
-                                self.diStatResults['Molgroups'][name][entry] = self.diMolgroups[name][entry]
-                        else:
-                            if entry not in self.diStatResults['Molgroups'][name]:
-                                self.diStatResults['Molgroups'][name][entry] = []
-                            self.diStatResults['Molgroups'][name][entry].append(self.diMolgroups[name][entry])
+                if self.diMolgroups is not None and self.diResults is not None:
+                    # Store Molgroups
+                    # self.diStatResults['Molgroups'].append(self.diMolgroups)
+                    for name in self.diMolgroups:
+                        if name not in self.diStatResults['Molgroups']:
+                            self.diStatResults['Molgroups'][name] = {}
+                        for entry in self.diMolgroups[name]:
+                            if entry == 'zaxis':
+                                # store z-axis only once
+                                if entry not in self.diStatResults['Molgroups'][name]:
+                                    self.diStatResults['Molgroups'][name][entry] = self.diMolgroups[name][entry]
+                            else:
+                                if entry not in self.diStatResults['Molgroups'][name]:
+                                    self.diStatResults['Molgroups'][name][entry] = []
+                                self.diStatResults['Molgroups'][name][entry].append(self.diMolgroups[name][entry])
 
-                # Store Derived Results
-                # origin is the name of the object that provided a result with a certain name
-                for origin in self.diResults:
-                    if origin not in self.diStatResults['Results']:
-                        self.diStatResults['Results'][origin] = {}
-                    for name in self.diResults[origin]:
-                        if name not in self.diStatResults['Results'][origin]:
-                            self.diStatResults['Results'][origin][name] = []
-                        self.diStatResults['Results'][origin][name].append(self.diResults[origin][name])
+                    # Store Derived Results
+                    # origin is the name of the object that provided a result with a certain name
+                    for origin in self.diResults:
+                        if origin not in self.diStatResults['Results']:
+                            self.diStatResults['Results'][origin] = {}
+                        for name in self.diResults[origin]:
+                            if name not in self.diStatResults['Results'][origin]:
+                                self.diStatResults['Results'][origin][name] = []
+                            self.diStatResults['Results'][origin][name].append(self.diResults[origin][name])
 
             finally:
                 j += 1

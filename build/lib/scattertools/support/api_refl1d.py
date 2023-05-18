@@ -6,7 +6,7 @@ import pandas
 import os
 
 from scattertools.support import api_bumps
-import scattertools
+import scattertools.scattertools as st
 
 
 # Refl1D methods will be used if a storage directory for a Markov Chain Monte Carlo (MCMC)
@@ -24,7 +24,7 @@ class CRefl1DAPI(api_bumps.CBumpsAPI):
         basestem{i}.basesuffix, whereby 'i' is an index from 0 to n-1.
         """
         def _load(stem, suffix):
-            comments = scattertools.extract_comments_from_file(os.path.join(self.spath, stem + suffix), "#")
+            comments = st.extract_comments_from_file(os.path.join(self.spath, stem + suffix), "#")
             data = pandas.read_csv(os.path.join(self.spath, stem + suffix), sep='\s+', skip_blank_lines=True,
                                    comment='#', header=None)
             # if there was a header move it from first row to header
@@ -69,7 +69,7 @@ class CRefl1DAPI(api_bumps.CBumpsAPI):
         """
         def _save(stem, suffix, frame, comment):
             frame.to_csv(os.path.join(self.spath, stem + suffix), sep=' ', index=None, header=None)
-            scattertools.add_comments_to_start_of_file(os.path.join(self.spath, stem + suffix), comment)
+            st.add_comments_to_start_of_file(os.path.join(self.spath, stem + suffix), comment)
 
         stem = pathlib.Path(basefilename).stem
         suffix = pathlib.Path(basefilename).suffix

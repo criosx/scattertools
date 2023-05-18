@@ -55,6 +55,9 @@ class CBumpsAPI(api_base.CBaseAPI):
         return points, lParName, logp
 
     def fnLoadMolgroups(self, problem=None):
+        if problem is None or not hasattr(problem, 'results') or not hasattr(problem, 'moldat'):
+            return None, None
+
         diMolgroups = {}
         diResults = problem.results
         moldict = problem.moldat
@@ -290,8 +293,7 @@ class CBumpsAPI(api_base.CBaseAPI):
         main.cli()
         '''
 
-        # Calling bumps functions directly
-
+        # Calling bumps functions directl
         model_file = os.path.join(self.spath, self.runfile) + '.py'
         mcmcpath = os.path.join(self.spath, self.mcmcpath)
 
