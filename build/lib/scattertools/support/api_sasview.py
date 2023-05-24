@@ -1,10 +1,13 @@
 from __future__ import print_function
 
 import copy
+import re
+
 import numpy
 import pandas
 import os
 import pathlib
+from re import VERBOSE, IGNORECASE, compile
 import shapely.geometry
 import sys
 
@@ -13,7 +16,47 @@ import numpy.random
 import sasmodels.data
 import bumps.curve
 
+import scattertools
 from scattertools.support import api_bumps
+
+
+def extract_data_filenames_from_runfile(runfile=None):
+    """
+    Returns the data filenames loaded in a fit script in the order they occur
+    :param runfile: path to runfile
+    :return: list of paths to data files
+    """
+    file = open(runfile, 'r+')
+    data = file.readlines()
+    file.close()
+    filelist = []
+    smatch = compile(r".*?load_data\(.*?\'(.+?)\'.*\)", IGNORECASE | VERBOSE)
+    for line in data:
+        mstring = smatch.match(line)
+        if mstring:
+            fname = mstring.groups()[0]
+            filelist.append(fname)
+    return filelist
+
+
+def write_data_filenames_to_runfile(runfile=None, filelist=None):
+    file = open(runfile, 'r+')
+    data = file.readlines()
+    file.close()
+    smatch = compile(r"(.*?load_data\(.*?\').*?(\'.*\))", IGNORECASE | VERBOSE)
+    newdata = []
+    i = 0
+    for line in data:
+        if re.match(smatch, line):
+            mstring = smatch.match(line)
+            newline = mstring.groups()[0] + filelist[i] + mstring.groups()[1] + '\n'
+            i += 1
+        else:
+            newline = line
+        newdata.append(newline)
+    file = open(runfile, 'w')
+    file.writelines(newdata)
+    file.close()
 
 
 class CSASViewAPI(api_bumps.CBumpsAPI):
@@ -63,7 +106,7 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
         def _save(stem, suffix, frame, comment):
             frame.to_csv(os.path.join(self.spath, stem + suffix), sep=' ', index=None)
             if comment:
-                general.add_comments_to_start_of_file(os.path.join(self.spath, stem + suffix), comment)
+                scattertools.add_comments_to_start_of_file(os.path.join(self.spath, stem + suffix), comment)
 
         stem = pathlib.Path(basefilename).stem
         suffix = pathlib.Path(basefilename).suffix

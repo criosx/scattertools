@@ -85,8 +85,13 @@ class CBumpsAPI(api_base.CBaseAPI):
         if self.state is None:
             self.state = self.fnRestoreState()
 
-        p = self.state.best()[0]
-        self.problem.setp(p)
+        if self.state is not None:
+            p = self.state.best()[0]
+            self.problem.setp(p)
+        else:
+            p = self.problem.getp()
+            print('Parameter directory does not contain best fit because state not loaded.')
+            print('Parameter values are from initialization of the model.')
 
         # from bumps.cli import load_best
         # load_best(problem, os.path.join(self.mcmcpath, self.runfile) + '.par')
@@ -180,9 +185,12 @@ class CBumpsAPI(api_base.CBaseAPI):
     def fnReplaceParameterLimitsInSetup(self, sname, flowerlimit, fupperlimit):
         """
         Scans self.runfile file for parameter with name sname and replaces the
-        lower and upper fit limits by the given values.
-        If a initialization value is given as part of the Parameter() function, it will be replaced as well.
-        The value= argument should follow the name= argument in Parameter()
+        lower and upper fit limits by the given values If an initialization value is given as part of the Parameter()
+        function, it will be replaced as well. The value= argument should follow the name= argument in Parameter()
+        :param sname: name of the parameter
+        :param flowerlimit: lower fit bound
+        :param fupperlimit: upper fit bound
+        :return: None
         """
 
         file = open(os.path.join(self.spath, self.runfile) + '.py', 'r+')
@@ -229,6 +237,7 @@ class CBumpsAPI(api_base.CBaseAPI):
         if path.isfile(os.path.join(self.spath, self.runfile + ".py")):
             problem = load_problem(os.path.join(self.spath, self.runfile + ".py"))
         else:
+            print("No file: " + os.path.join(self.spath, self.runfile + ".py"))
             print("No problem to reload.")
             problem = None
         return problem
