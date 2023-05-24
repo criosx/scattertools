@@ -182,7 +182,7 @@ class CBumpsAPI(api_base.CBaseAPI):
             self.fnRestoreBackup(origin, target)
             shutil.rmtree(target)
 
-    def fnReplaceParameterLimitsInSetup(self, sname, flowerlimit, fupperlimit):
+    def fnReplaceParameterLimitsInSetup(self, sname, flowerlimit, fupperlimit, modify=None):
         """
         Scans self.runfile file for parameter with name sname and replaces the
         lower and upper fit limits by the given values If an initialization value is given as part of the Parameter()
@@ -190,6 +190,7 @@ class CBumpsAPI(api_base.CBaseAPI):
         :param sname: name of the parameter
         :param flowerlimit: lower fit bound
         :param fupperlimit: upper fit bound
+        :param modify: default is None, 'add' add parameter with name and limits, 'remove' remove parameter from script
         :return: None
         """
 
@@ -201,13 +202,46 @@ class CBumpsAPI(api_base.CBaseAPI):
         # version when .range() is present but no parameter value is provided
         smatch2 = compile(r"(.*?\."+sname+'\.range\().+?(,).+?(\).*)', IGNORECASE | VERBOSE)
         newdata = []
+        found_match = False
         for line in data:
             # apply version 1 for general case
             newline = smatch.sub(r'\1 ' + str(0.5*(flowerlimit+fupperlimit)) + r'\2 ' + str(flowerlimit) + r'\3 ' +
                                  str(fupperlimit) + r'\4', line)
             # apply version 2 to catch both cases, potentially redundant for limits
             newline = smatch2.sub(r'\1 ' + str(flowerlimit) + r'\2 ' + str(fupperlimit) + r'\3', newline)
-            newdata.append(newline)
+
+            mstring1 = smatch.match(line)
+            mstring2 = smatch2.match(line)
+            if mstring1 or mstring2:
+                found_match = True
+                # check if instruction is commented out, but we want to add it to the script
+                # does not support comment blocks
+                if modify == 'add':
+                    newline = newline.strip()
+                    while len(newline) > 0 and newline[0] == '#':
+                        newline = newline[1:]
+                    newline = newline.strip()
+                    newline = newline + '\n'
+            # remove par if match found and flag set
+            if not (modify == 'remove' and (mstring1 or mstring2)):
+                newdata.append(newline)
+
+        if modify == 'add' and not found_match:
+            insertpoint = None
+            codestr = ''
+            smatch3 = compile(r".*?Experiment.*?model.*?=(.*?)\).*", IGNORECASE | VERBOSE)
+            for i, line in reversed(list(enumerate(newdata))):
+                mstring = smatch3.match(line)
+                if mstring:
+                    insertpoint = i
+                    modelname = mstring.groups()[0]
+                    modelname = modelname.strip()
+                    codestr = modelname + '.' + sname + '.range(' + str(flowerlimit) + ', ' + str(fupperlimit) + ')\n'
+
+            if insertpoint is not None and insertpoint > 0:
+                if newdata[insertpoint-1].isspace():
+                    insertpoint -= 1
+                newdata.insert(insertpoint, codestr)
 
         file = open(os.path.join(self.spath, self.runfile) + '.py', 'w')
         file.writelines(newdata)

@@ -39,6 +39,17 @@ def extract_data_filenames_from_runfile(runfile=None):
     return filelist
 
 
+def extract_parameters_from_runfile(runfile=None):
+    """
+    Different from SASViewAPI routines that usese the bumps.problem object, this function extracts fittable and
+    commented parameters from the runscript.
+    :param runfile: path to runfile
+    :return: Pandas dataframe with parameter names, values, bounds, and info whether it is fittable
+    """
+    pass
+    return
+
+
 def write_data_filenames_to_runfile(runfile=None, filelist=None):
     file = open(runfile, 'r+')
     data = file.readlines()
