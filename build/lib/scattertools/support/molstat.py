@@ -5,7 +5,32 @@ from scipy import stats, special
 import numpy
 import pandas
 import os
+import shutil
 import bumps.curve
+
+
+def prepare_fit_directory(fitdir=None, runfile=None, datafile_names=None):
+    """
+    Makes or empties a fit directory and copies a bumps-style runfile and the data to this directory.
+    :param fitdir: path to the fit directory
+    :param runfile: bumps-style runfile
+    :param datafile_names: list of paths to the data
+    :return: None
+    """
+    if not os.path.isdir(fitdir):
+        os.mkdir(fitdir)
+    else:
+        for f in os.listdir(fitdir):
+            fpath = os.path.join(fitdir, f)
+            if os.path.isfile(fpath):
+                os.remove(fpath)
+            elif os.path.isdir(fpath):
+                shutil.rmtree(fpath)
+    # copy script and runfiles into fitdir
+    shutil.copyfile(runfile, os.path.join(fitdir, os.path.basename(runfile)))
+    for file in datafile_names:
+        if os.path.isfile(file):
+            shutil.copyfile(file, os.path.join(fitdir, os.path.basename(file)))
 
 
 class CMolStat:
@@ -57,7 +82,12 @@ class CMolStat:
         self.fitsource = fitsource  # define fitting software
         self.spath = spath
         self.mcmcpath = mcmcpath
-        self.runfile = runfile
+
+        # check if runfile has .py ending, if yes, strip it
+        if os.path.splitext(runfile)[1] == '.py':
+            self.runfile = os.path.splitext(runfile)[0]
+        else:
+            self.runfile = runfile
 
         self.liStatResult = []  # a list that contains the isErr.dat or sErr.dat file line by line
         self.sStatResultHeader = ''  # headerline from isErr.dat or sErr.dat
@@ -71,16 +101,17 @@ class CMolStat:
         self.Interactor = None
         if self.fitsource == "bumps":
             from scattertools.support import api_bumps
-            self.Interactor = api_bumps.CBumpsAPI(spath, mcmcpath, runfile, state, problem, load_state=load_state)
+            self.Interactor = api_bumps.CBumpsAPI(self.spath, self.mcmcpath, self.runfile, state, problem,
+                                                  load_state=load_state)
         elif self.fitsource == 'refl1d':
             from scattertools.support import api_refl1d
-            self.Interactor = api_refl1d.CRefl1DAPI(spath, mcmcpath, runfile, load_state=load_state)
+            self.Interactor = api_refl1d.CRefl1DAPI(self.spath, self.mcmcpath, self.runfile, load_state=load_state)
         elif self.fitsource == 'garefl':
             from scattertools.support import api_garefl
-            self.Interactor = api_garefl.CGaReflAPI(spath, mcmcpath, runfile, load_state=load_state)
+            self.Interactor = api_garefl.CGaReflAPI(self.spath, self.mcmcpath, self.runfile, load_state=load_state)
         elif self.fitsource == 'SASView':
             from scattertools.support import api_sasview
-            self.Interactor = api_sasview.CSASViewAPI(spath, mcmcpath, runfile, load_state=load_state)
+            self.Interactor = api_sasview.CSASViewAPI(self.spath, self.mcmcpath, self.runfile, load_state=load_state)
 
         self.save_stat_data = save_stat_data
 
@@ -333,6 +364,7 @@ class CMolStat:
     def fnLoadParameters(self):
         if self.diParameters == {}:
             self.diParameters, self.chisq = self.Interactor.fnLoadParameters()
+        return self.diParameters
 
     def fnLoadStatData(self, sparse=0):
         self.fnLoadParameters()
@@ -410,30 +442,31 @@ class CMolStat:
                 # Recreate Molgroups and Derived Results
                 self.diMolgroups, self.diResults = self.Interactor.fnLoadMolgroups(problem)
 
-                # Store Molgroups
-                # self.diStatResults['Molgroups'].append(self.diMolgroups)
-                for name in self.diMolgroups:
-                    if name not in self.diStatResults['Molgroups']:
-                        self.diStatResults['Molgroups'][name] = {}
-                    for entry in self.diMolgroups[name]:
-                        if entry == 'zaxis':
-                            # store z-axis only once
-                            if entry not in self.diStatResults['Molgroups'][name]:
-                                self.diStatResults['Molgroups'][name][entry] = self.diMolgroups[name][entry]
-                        else:
-                            if entry not in self.diStatResults['Molgroups'][name]:
-                                self.diStatResults['Molgroups'][name][entry] = []
-                            self.diStatResults['Molgroups'][name][entry].append(self.diMolgroups[name][entry])
+                if self.diMolgroups is not None and self.diResults is not None:
+                    # Store Molgroups
+                    # self.diStatResults['Molgroups'].append(self.diMolgroups)
+                    for name in self.diMolgroups:
+                        if name not in self.diStatResults['Molgroups']:
+                            self.diStatResults['Molgroups'][name] = {}
+                        for entry in self.diMolgroups[name]:
+                            if entry == 'zaxis':
+                                # store z-axis only once
+                                if entry not in self.diStatResults['Molgroups'][name]:
+                                    self.diStatResults['Molgroups'][name][entry] = self.diMolgroups[name][entry]
+                            else:
+                                if entry not in self.diStatResults['Molgroups'][name]:
+                                    self.diStatResults['Molgroups'][name][entry] = []
+                                self.diStatResults['Molgroups'][name][entry].append(self.diMolgroups[name][entry])
 
-                # Store Derived Results
-                # origin is the name of the object that provided a result with a certain name
-                for origin in self.diResults:
-                    if origin not in self.diStatResults['Results']:
-                        self.diStatResults['Results'][origin] = {}
-                    for name in self.diResults[origin]:
-                        if name not in self.diStatResults['Results'][origin]:
-                            self.diStatResults['Results'][origin][name] = []
-                        self.diStatResults['Results'][origin][name].append(self.diResults[origin][name])
+                    # Store Derived Results
+                    # origin is the name of the object that provided a result with a certain name
+                    for origin in self.diResults:
+                        if origin not in self.diStatResults['Results']:
+                            self.diStatResults['Results'][origin] = {}
+                        for name in self.diResults[origin]:
+                            if name not in self.diStatResults['Results'][origin]:
+                                self.diStatResults['Results'][origin][name] = []
+                            self.diStatResults['Results'][origin][name].append(self.diResults[origin][name])
 
             finally:
                 j += 1

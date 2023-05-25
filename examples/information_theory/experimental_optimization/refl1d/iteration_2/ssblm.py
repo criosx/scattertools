@@ -40,8 +40,8 @@ vf_bilayer = Parameter(name='volume_fraction_bilayer', value= 0.5).range( 0.0, 1
 l_lipid1 = Parameter(name='inner_acyl_chain_thickness', value= 12.0).range( 8.0, 16.0)
 l_lipid2 = Parameter(name='outer_acyl_chain_thickness', value= 12.0).range( 8.0, 16.0)
 sigma = Parameter(name='bilayer_roughness', value= 5.5).range( 2.0, 9.0)
-global_rough = Parameter(name ='tiox_roughness', value=5).range( 2.0, 9.0)
-l_tiox = Parameter(name='total_tiox_thickness', value=120).range( 66.379, 266.38)
+global_rough = Parameter(name ='tiox_roughness', value=5).range(2, 9)
+l_tiox = Parameter(name='total_tiox_thickness', value=120).range(50, 150)
 l_submembrane = Parameter(name='submembrane_thickness', value= 25.0).range( 0.0, 50.0)
 
 ### Define bilayer object
@@ -67,7 +67,7 @@ silicon = SLD(name='silicon', rho=2.0690, irho=0.0000)
 
 layer_d2o = Slab(material=d2o, thickness=0.0000, interface=5.0000)
 layer_h2o = Slab(material=h2o, thickness=0.0000, interface=5.0000)
-layer_tiox = Slab(material=tiox, thickness=l_tiox - (blm.substrate.z + 0.5 * blm.substrate.l), interface=0.0)
+layer_tiox = Slab(material=tiox, thickness=l_tiox - (blm.substrate.z + 0.5 * blm.substrate.length), interface=0.0)
 layer_siox = Slab(material=siox, thickness=7.5804, interface=10.000)
 layer_silicon = Slab(material=silicon, thickness=0.0000, interface=0.0000)
 
