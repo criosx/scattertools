@@ -282,7 +282,7 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
                 ["dq_q", None],
                 ["lambda", 6],
                 ["dlambda_lambda", 0.125],
-                ["sascalc", False]
+                ["instrument", 'pinhole']
             ]
             # fill in defaults if no preset entries
             _add_default(configuration, kl_list)
@@ -325,7 +325,7 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
             omega = (Q * configuration['lambda'])**2 / (4 * numpy.pi)
             delta_omega = numpy.gradient(omega)
 
-            if configuration["sascalc"]:
+            if configuration["instrument"] != 'pinhole':
                 # calculate n_cell(q) and dq/q using Jeff's sascalc implementation
                 # li_n_cell, li_dq_q = jeff.sascalc(liData, configuration)
                 # TODO: Update once Jeff's routine is available, until then use this placeholder:
