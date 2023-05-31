@@ -70,6 +70,17 @@ def write_data_filenames_to_runfile(runfile=None, filelist=None):
     file.close()
 
 
+def write_dummy_sans_file(filepath):
+    if not os.path.isfile(filepath):
+        dummyfile = ['Q I dI dQ\n']
+        for i in range(100):
+            dummyfile.append(str(float(i) * 0.005) + ' ' + str(1.0 - float(i) * 0.005) + ' 0.001 0.001\n')
+        dummyfile.append('\n')
+        file = open(filepath, 'w')
+        file.writelines(dummyfile)
+        file.close()
+
+
 class CSASViewAPI(api_bumps.CBumpsAPI):
     def __init__(self, spath='.', mcmcpath='.', runfile='', load_state=True):
         super().__init__(spath, mcmcpath, runfile, load_state=load_state)
@@ -282,7 +293,7 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
                 ["dq_q", None],
                 ["lambda", 6],
                 ["dlambda_lambda", 0.125],
-                ["sascalc", False]
+                ["instrument", 'pinhole']
             ]
             # fill in defaults if no preset entries
             _add_default(configuration, kl_list)
@@ -325,7 +336,7 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
             omega = (Q * configuration['lambda'])**2 / (4 * numpy.pi)
             delta_omega = numpy.gradient(omega)
 
-            if configuration["sascalc"]:
+            if configuration["instrument"] != 'pinhole':
                 # calculate n_cell(q) and dq/q using Jeff's sascalc implementation
                 # li_n_cell, li_dq_q = jeff.sascalc(liData, configuration)
                 # TODO: Update once Jeff's routine is available, until then use this placeholder:
