@@ -473,7 +473,7 @@ class CMolStat:
 
         # save stat data to disk, if flag is set
         if self.save_stat_data:
-            self.fnSaveObject(self.diStatResults, f'{self.spath}/{self.mcmcpath}/StatDataPython.dat')
+            self.fnSaveObject(self.diStatResults, os.path.join(self.spath, self.mcmcpath, 'StatDataPython.dat'))
 
     def fnPrintPar(self):
         # prints parameters and their errors from the covariance matrix onto the screen
