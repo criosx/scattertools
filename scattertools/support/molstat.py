@@ -116,6 +116,19 @@ class CMolStat:
         self.save_stat_data = save_stat_data
 
     def fnAnalyzeStatFile(self, fConfidence=-1, sparse=0):
+        """
+        Summarizes statistical information from MCMC for parameters, results, and SLD profiles (Molecular groups
+        are handled by fnProfilesStat). Results are stored in self.diStatResults['Parameters'] and
+        self.diStatResults['Results'].
+
+        :param confidence: 0 < confidence < 1, percentile used for statistical analysis
+                           confidence < 0: multiple of sigmas used for statistical analysis (-1 -> 1 sigma,
+                           -2 -> 2 sigma, ...)
+        :param sparse: 0 < sparse < 1, fraction of statistical data from the MCMC that is used the summary
+                           sparse > 1, number of iterations from the MCMC used for summary
+
+        :return: Pandas dataframe with statistical results in addition to internal storage of the results
+        """
 
         def data_append(data, origin, name, vis, lower_limit, upper_limit, lower_percentile, median_percentile,
                         upper_percentile, interval_lower, interval_upper, confidence):
@@ -148,10 +161,10 @@ class CMolStat:
                 'confidence': []
                 }
 
-        fConfidence = min(fConfidence, 1)
-        if fConfidence < 0:
-            fConfidence = special.erf(-1 * fConfidence / sqrt(2))
-        percentiles = (100.0 * (1 - fConfidence) / 2, 50., 100.0 - 100.0 * (1 - fConfidence) / 2)
+        confidence = min(fConfidence, 1)
+        if confidence < 0:
+            confidence = special.erf(-1 * confidence / sqrt(2))
+        percentiles = (100.0 * (1 - confidence) / 2, 50., 100.0 - 100.0 * (1 - confidence) / 2)
         iNumberOfMCIterations = self.diStatResults['NumberOfStatValues']
 
         print('Analysis of MCMC fit ...')
@@ -199,7 +212,7 @@ class CMolStat:
                 self.diStatResults['Parameters'][element]['UpperLimitCollision'] = False
 
             data = data_append(data, 'fit', element, sGraphOutput, flowerlimit, fupperlimit, perc[0], perc[1],
-                               perc[2], perc[0]-perc[1], perc[2]-perc[1], fConfidence)
+                               perc[2], perc[0]-perc[1], perc[2]-perc[1], confidence)
 
         # Derived parameters – results
         for origin in self.diStatResults['Results']:
@@ -207,9 +220,15 @@ class CMolStat:
                 vals = self.diStatResults['Results'][origin][name]
                 perc = stats.scoreatpercentile(vals, percentiles)
                 data = data_append(data, origin, name, '', None, None, perc[0], perc[1], perc[2], perc[0]-perc[1],
-                                   perc[2]-perc[1], fConfidence)
+                                   perc[2]-perc[1], confidence)
 
-        # Pandas Dataframe
+        # Molgroups, internal storage of the results only
+        self.fnProfilesStat(sparse=sparse, conf=percentiles)
+
+        # SLD profiles, internal storage of the results only
+        self.fnSLDProfilesStat(sparse=sparse, conf=percentiles)
+
+        # Return Pandas dataframe of parameters and results
         return pandas.DataFrame(data)
 
     @staticmethod
@@ -402,8 +421,6 @@ class CMolStat:
 
         for iteration in range(self.diStatResults['NumberOfStatValues']):
             try:
-                # appends a new list for profiles for the current MC iteration
-                self.diStatResults['nSLDProfiles'].append([])
                 liParameters = list(self.diParameters.keys())
 
                 # sort by number of appereance in setup file
@@ -434,10 +451,10 @@ class CMolStat:
                     for M in problem.models:
                         if not isinstance(M.fitness, bumps.curve.Curve):
                             z, rho, irho = self.Interactor.fnRestoreSmoothProfile(M)
-                            self.diStatResults['nSLDProfiles'][-1].append((z, rho, irho))
+                            self.diStatResults['nSLDProfiles'].append((z, rho, irho))
                 else:
                     z, rho, irho = self.Interactor.fnRestoreSmoothProfile(problem)
-                    self.diStatResults['nSLDProfiles'][-1].append((z, rho, irho))
+                    self.diStatResults['nSLDProfiles'].append((z, rho, irho))
 
                 # Recreate Molgroups and Derived Results
                 self.diMolgroups, self.diResults = self.Interactor.fnLoadMolgroups(problem)
@@ -501,19 +518,38 @@ class CMolStat:
                                                            fLowLim, self.diParameters[parameter]['upperlimit']))
         print('Chi squared: %g' % self.chisq)
 
-    def fnProfilesStat(self, sparse=0):
+    def fnProfilesStat(self, sparse=0, conf=(18., 50., 82.)):
+        """
+        Summarizes the statistical data for all molecular groups from the MCMC and produces median and ± sigma
+        profiles of the area, SL, and SLD for each. Results are stored in the internal self.diStatResults dictionary
+        under self.diStatResults['Molgroups'][group]['median area', 'median sl', 'median sld', 'psigma area',
+        'psigma sl', 'psigma sld', 'msigma area', 'msigma sl', 'msigma sld'].
+
+        :param sparse: 0 < sparse < 1, fraction of statistical data from the MCMC that is used the summary
+                           sparse > 1, number of iterations from the MCMC used for summary
+        :param conf: tuple of percentiles (<100) for median and confidence limits (lower, median, higher)
+
+        :return: no return value
+        """
         self.fnLoadStatData(sparse)
 
+        if 'Molgroups' not in self.diStatResults.keys():
+            return
+
+        c1 = conf[0]
+        c2 = conf[1]
+        c3 = conf[2]
+
         for group in self.diStatResults['Molgroups']:
-            median_area = numpy.percentile(self.diStatResults['Molgroups'][group]['area'], 50., axis=0)
-            psigma_area = numpy.percentile(self.diStatResults['Molgroups'][group]['area'], 82., axis=0)
-            msigma_area = numpy.percentile(self.diStatResults['Molgroups'][group]['area'], 18., axis=0)
-            median_sl = numpy.percentile(self.diStatResults['Molgroups'][group]['sl'], 50., axis=0)
-            psigma_sl = numpy.percentile(self.diStatResults['Molgroups'][group]['sl'], 82., axis=0)
-            msigma_sl = numpy.percentile(self.diStatResults['Molgroups'][group]['sl'], 18., axis=0)
-            median_sld = numpy.percentile(self.diStatResults['Molgroups'][group]['sld'], 50., axis=0)
-            psigma_sld = numpy.percentile(self.diStatResults['Molgroups'][group]['sld'], 82., axis=0)
-            msigma_sld = numpy.percentile(self.diStatResults['Molgroups'][group]['sld'], 18., axis=0)
+            median_area = numpy.percentile(self.diStatResults['Molgroups'][group]['area'], c2, axis=0)
+            psigma_area = numpy.percentile(self.diStatResults['Molgroups'][group]['area'], c3, axis=0)
+            msigma_area = numpy.percentile(self.diStatResults['Molgroups'][group]['area'], c1, axis=0)
+            median_sl = numpy.percentile(self.diStatResults['Molgroups'][group]['sl'], c2, axis=0)
+            psigma_sl = numpy.percentile(self.diStatResults['Molgroups'][group]['sl'], c3, axis=0)
+            msigma_sl = numpy.percentile(self.diStatResults['Molgroups'][group]['sl'], c1, axis=0)
+            median_sld = numpy.percentile(self.diStatResults['Molgroups'][group]['sld'], c2, axis=0)
+            psigma_sld = numpy.percentile(self.diStatResults['Molgroups'][group]['sld'], c3, axis=0)
+            msigma_sld = numpy.percentile(self.diStatResults['Molgroups'][group]['sld'], c1, axis=0)
 
             self.diStatResults['Molgroups'][group]['median area'] = median_area
             self.diStatResults['Molgroups'][group]['psigma area'] = psigma_area
@@ -676,4 +712,37 @@ class CMolStat:
         # TODO: one could make this more consistent and remove save_file from function signature
         self.Interactor.fnSaveData(basefilename, liData)
         return liData
+
+    def fnSLDProfilesStat(self, sparse=0, conf=(18., 50., 82.)):
+        """
+        Summarizes the statistical data for all SLD profiles from the MCMC and produces median and ± sigma
+        profiles of the rho and irho for each. Results are stored in the internal self.diStatResults dictionary
+        under self.diStatResults['SLD']['median rho', 'msigma rho', 'psigma rho', 'median irho', 'msigma irho',
+        'psigma irho'].
+
+        :param sparse: 0 < sparse < 1, fraction of statistical data from the MCMC that is used the summary
+                           sparse > 1, number of iterations from the MCMC used for summary
+        :param conf: tuple of percentiles (<100) for median and confidence limits (lower, median, higher)
+        :return: no return value
+        """
+        self.fnLoadStatData(sparse)
+
+        if 'nSLDProfiles' not in self.diStatResults.keys():
+            return
+
+        profiles = numpy.array(self.diStatResults['nSLDProfiles'])
+        rho = profiles[:, 1]
+        irho = profiles[:, 2]
+        c1 = conf[0]
+        c2 = conf[1]
+        c3 = conf[2]
+
+        self.diStatResults['SLD'] = {}
+        self.diStatResults['SLD']['z'] = profiles[0, 0]
+        self.diStatResults['SLD']['msigma rho'] = numpy.percentile(rho, c1, axis=0)
+        self.diStatResults['SLD']['median rho'] = numpy.percentile(rho, c2, axis=0)
+        self.diStatResults['SLD']['psigma rho'] = numpy.percentile(rho, c3, axis=0)
+        self.diStatResults['SLD']['msigma irho'] = numpy.percentile(irho, c1, axis=0)
+        self.diStatResults['SLD']['median irho'] = numpy.percentile(irho, c2, axis=0)
+        self.diStatResults['SLD']['psigma irho'] = numpy.percentile(irho, c3, axis=0)
 

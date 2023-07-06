@@ -161,10 +161,6 @@ class CBumpsAPI(api_base.CBaseAPI):
                 if dSparse == 0 or (dSparse > 1 and j < dSparse) or (1 > dSparse > random()):
                     diStatRawData["Parameters"]["Chisq"]["Values"].append(logp[j])
                     for i, parname in enumerate(lParName):
-                        # TODO: this is a hack because Paul does not scale down after scaling up
-                        # Rescaling disabled for bumps/refl1d analysis to achieve consistency
-                        # if ('rho_' in parname or 'background' in parname) and rescale_small_numbers:
-                        #     points[j, i] *= 1E-6
                         diStatRawData["Parameters"][parname]["Values"].append(points[j, i])
 
             self.fnSaveSingleColumnsFromStatDict(os.path.join(self.spath, self.mcmcpath, "sErr.dat"),
