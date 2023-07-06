@@ -122,7 +122,7 @@ class CRefl1DAPI(api_bumps.CBumpsAPI):
                 config = liConfigurations
 
             pre = _setconf(config, 'pre', pre)
-            s1min = _setconf(config, 's1mine', s1min)
+            s1min = _setconf(config, 's1min', s1min)
             s1max = _setconf(config, 's1max', s1max)
             s2min = _setconf(config, 's2min', s2min)
             s2max = _setconf(config, 's2max', s2max)
