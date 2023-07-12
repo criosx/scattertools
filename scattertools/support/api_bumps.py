@@ -291,12 +291,19 @@ class CBumpsAPI(api_base.CBaseAPI):
         z, rho, irho = M.sld, [], []
         return z, rho, irho
 
-    def fnRunMCMC(self, burn=8000, steps=500, batch=False, fitter='MCMC', reload_problem=True):
+    def fnRunMCMC(self, burn=8000, steps=500, batch=False, fitter='MCMC', reload_problem=True, resume=False):
         """
         Runs fit for Bumps object.
-        Default is 'MCMC', but 'LM' is supported, as well.
-        'reload_problem' determines whether the problem is reloaded from disk or whether the internally stored problem
-        is used, including any potential best-fit parameters from a previous run or restore.
+
+        :param burn: number of burn steps of the MCMC
+        :param steps: number of production steps of the MCMC or the LM
+        :param batch: uses the bumps 'batch' option, which silences most output and plot generation
+        :param fitter: Default is 'MCMC', but 'LM' is supported, as well.
+        :param reload_problem: determines whether the problem is reloaded from disk or whether the internally stored
+                               problem is used, including any potential best-fit parameters from a previous run or
+                               restore.
+        :param resume: if True, resumes a fit from the store directory
+        :return: no return value
         """
 
         # Original Method of Calling the Shell
@@ -356,8 +363,10 @@ class CBumpsAPI(api_base.CBaseAPI):
                                steps=steps, xtol=1e-6, ftol=1e-8)
         else:
             driver = None
-
-        x, fx = driver.fit()
+        if resume:
+            x, fx = driver.fit(resume=os.path.join(mcmcpath, self.runfile))
+        else:
+            x, fx = driver.fit()
 
         # try to deal with matplotlib memory leaks
         matplotlib.interactive(False)

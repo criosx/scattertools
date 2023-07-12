@@ -121,7 +121,7 @@ class CMolStat:
         are handled by fnProfilesStat). Results are stored in self.diStatResults['Parameters'] and
         self.diStatResults['Results'].
 
-        :param confidence: 0 < confidence < 1, percentile used for statistical analysis
+        :param fConfidence: 0 < confidence < 1, percentile used for statistical analysis
                            confidence < 0: multiple of sigmas used for statistical analysis (-1 -> 1 sigma,
                            -2 -> 2 sigma, ...)
         :param sparse: 0 < sparse < 1, fraction of statistical data from the MCMC that is used the summary
@@ -452,6 +452,8 @@ class CMolStat:
                         if not isinstance(M.fitness, bumps.curve.Curve):
                             z, rho, irho = self.Interactor.fnRestoreSmoothProfile(M)
                             self.diStatResults['nSLDProfiles'].append((z, rho, irho))
+                            # only report SLD profile for first model
+                            break
                 else:
                     z, rho, irho = self.Interactor.fnRestoreSmoothProfile(problem)
                     self.diStatResults['nSLDProfiles'].append((z, rho, irho))
@@ -650,7 +652,7 @@ class CMolStat:
     def fnRestoreFit(self):
         self.Interactor.fnRestoreFit()
 
-    def fnRunFit(self, burn=2000, steps=500, batch=False):
+    def fnRunFit(self, burn=2000, steps=500, batch=False, resume=False):
         path1 = os.path.join(self.spath, self.mcmcpath)
         if os.path.isfile(os.path.join(path1, "sErr.dat")):
             os.remove(os.path.join(path1, "sErr.dat"))
@@ -658,7 +660,7 @@ class CMolStat:
             os.remove(os.path.join(path1,  "isErr.dat"))
         if os.path.isfile(os.path.join(path1,  "StatDataPython.dat")):
             os.remove(os.path.join(path1,  "StatDataPython.dat"))
-        self.Interactor.fnRunMCMC(burn, steps, batch=False)
+        self.Interactor.fnRunMCMC(burn, steps, batch=batch, resume=resume)
 
     @staticmethod
     def fnSaveObject(save_object, sFileName):
