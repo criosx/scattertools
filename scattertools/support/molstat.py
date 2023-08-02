@@ -442,21 +442,8 @@ class CMolStat:
                 if 'models' in dir(problem):
                     for M in problem.models:
                         M.chisq()
-                        break
                 else:
                     problem.chisq()
-
-                # distinguish between FitProblem and MultiFitProblem
-                if 'models' in dir(problem):
-                    for M in problem.models:
-                        if not isinstance(M.fitness, bumps.curve.Curve):
-                            z, rho, irho = self.Interactor.fnRestoreSmoothProfile(M)
-                            self.diStatResults['nSLDProfiles'].append((z, rho, irho))
-                            # only report SLD profile for first model
-                            break
-                else:
-                    z, rho, irho = self.Interactor.fnRestoreSmoothProfile(problem)
-                    self.diStatResults['nSLDProfiles'].append((z, rho, irho))
 
                 # Recreate Molgroups and Derived Results
                 self.diMolgroups, self.diResults = self.Interactor.fnLoadMolgroups(problem)
@@ -486,6 +473,19 @@ class CMolStat:
                             if name not in self.diStatResults['Results'][origin]:
                                 self.diStatResults['Results'][origin][name] = []
                             self.diStatResults['Results'][origin][name].append(self.diResults[origin][name])
+
+                # distinguish between FitProblem and MultiFitProblem
+                if 'models' in dir(problem):
+                    for M in problem.models:
+                        if not isinstance(M.fitness, bumps.curve.Curve):
+                            z, rho, irho = self.Interactor.fnRestoreSmoothProfile(M)
+                            self.diStatResults['nSLDProfiles'].append((z, rho, irho))
+                            # only report SLD profile for first model
+                            break
+                else:
+                    z, rho, irho = self.Interactor.fnRestoreSmoothProfile(problem)
+                    self.diStatResults['nSLDProfiles'].append((z, rho, irho))
+
 
             finally:
                 j += 1
@@ -732,7 +732,29 @@ class CMolStat:
         if 'nSLDProfiles' not in self.diStatResults.keys():
             return
 
-        profiles = numpy.array(self.diStatResults['nSLDProfiles'])
+        # identify longest z-axis in stat data
+        maxlength = 0
+        maxpos = 0
+        for i, dataset in enumerate(self.diStatResults['nSLDProfiles']):
+            length = len(dataset[0])
+            if length > maxlength:
+                maxlength = length
+                maxpos = i
+
+        if maxlength <= 0:
+            return
+
+        numdatasets = len(self.diStatResults['nSLDProfiles'])
+        profiles = numpy.empty([numdatasets, 3, maxlength])
+
+        # interpolate profiles onto max length, this assumes that the longest axis also has the
+        # smallest and largest values, which might be false, but should be inconsequential in most
+        # cases
+        for i, dataset in enumerate(self.diStatResults['nSLDProfiles']):
+            profiles[i, 0] = self.diStatResults['nSLDProfiles'][maxpos][0]
+            profiles[i, 1] = numpy.interp(profiles[i, 0], dataset[0], dataset[1])
+            profiles[i, 2] = numpy.interp(profiles[i, 0], dataset[0], dataset[2])
+
         rho = profiles[:, 1]
         irho = profiles[:, 2]
         c1 = conf[0]
