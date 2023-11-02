@@ -1,5 +1,7 @@
 from __future__ import print_function
 from math import fabs, pow, sqrt
+import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
 import pathlib
 from random import normalvariate
 import pandas
@@ -12,10 +14,117 @@ import scattertools.scattertools as st
 # Refl1D methods will be used if a storage directory for a Markov Chain Monte Carlo (MCMC)
 # error analysis are found.
 # The MCMC directory is called 'MCMC'
-# The refl1d script name has to be run.py.
+# The Refl1d script name has to be run.py.
 class CRefl1DAPI(api_bumps.CBumpsAPI):
     def __init__(self, spath='.', mcmcpath='.', runfile='', load_state=True):
         super().__init__(spath, mcmcpath, runfile, load_state=load_state)
+
+    def fnPlotFit(self, plotname='fitplot'):
+        font = FontProperties(size='x-small')
+        plt.figure(1, figsize=(14, 10))
+
+        iCounter = 1
+        while 1:
+            sfilename = os.path.join(self.spath, self.mcmcpath, self.runfile + '-' + str(iCounter) + '-refl.dat')
+            print(sfilename)
+            if os.path.isfile(sfilename):
+                file = open(sfilename, 'r')
+                data = file.readlines()
+                file.close()
+                data = data[1:]
+
+                k = 0
+                l = 0
+                qlist = []
+                dqlist = []
+                Rlist = []
+                dRlist = []
+                fitlist = []
+                fitRFlist = []
+                RFlist = []
+                dRFlist = []
+                reslist = []
+                resplus = []
+                resminus = []
+                for line in data:
+                    if '#' not in line:
+                        splitline = line.split()
+                        qlist.append(float(splitline[0]))
+                        dqlist.append(float(splitline[1]))
+                        Rlist.append(float(splitline[2]))
+                        dRlist.append(float(splitline[3]))
+                        fitlist.append(float(splitline[4]))
+                        RFlist.append(float(splitline[2]) * pow(float(splitline[0]), 4))
+                        dRFlist.append(float(splitline[3]) * pow(float(splitline[0]), 4))
+                        fitRFlist.append(float(splitline[4]) * pow(float(splitline[0]), 4))
+                        reslist.append((float(splitline[2]) - float(splitline[4])) * pow(float(splitline[3]), -1))
+                        resplus.append(1)
+                        resminus.append(-1)
+                plt.subplot(221)
+                plt.errorbar(qlist, Rlist, yerr=dRlist, xerr=dqlist, fmt='.')
+                plt.semilogy(qlist, fitlist, label='fit' + str(iCounter))
+                plt.xlim(xmin=-0.01)
+                plt.subplot(222)
+                plt.errorbar(qlist, RFlist, yerr=dRFlist, xerr=dqlist, fmt='.')
+                plt.semilogy(qlist, fitRFlist, label='fit' + str(iCounter))
+                plt.xlim(xmin=-0.01)
+                plt.subplot(223)
+                plt.plot(qlist, reslist, label='fit' + str(iCounter))
+                plt.plot(qlist, resplus, 'r')
+                plt.plot(qlist, resminus, 'r')
+                iCounter = iCounter + 1
+
+            else:
+                break
+
+        iCounter = 1
+        while 1:
+            sfilename = os.path.join(self.spath, self.mcmcpath, self.runfile + '-' + str(iCounter) + '-profile.dat')
+            if os.path.isfile(sfilename):
+                file = open(sfilename, 'r')
+                data = file.readlines()
+                file.close()
+                data = data[1:]
+                zlist = []
+                rholist = []
+                for line in data:
+                    if '#' not in line:
+                        splitline = line.split()
+                        zlist.append(float(splitline[0]))
+                        rholist.append(float(splitline[1]) * 1e6)
+
+                plt.subplot(224)
+                plt.plot(zlist, rholist, label='profile' + str(iCounter))
+
+                iCounter = iCounter + 1
+
+            else:
+                break
+
+        plt.subplot(221)
+        plt.ylabel('Reflectivity / R')
+        plt.xlabel('q / Ang-1')
+        plt.legend(loc=0, prop=font)
+
+        plt.subplot(222)
+        plt.ylabel('R*Q^4')
+        plt.xlabel('q / Ang-1')
+        plt.legend(loc=0, prop=font)
+
+        plt.subplot(223)
+        plt.ylabel('Normalized Residuals/ (R -F(q))/dR')
+        plt.xlabel('q / Ang-1')
+        plt.legend(loc=0, prop=font)
+
+        plt.subplot(224)
+        plt.ylabel('nSLD / 1e-6 Ang-2')
+        plt.xlabel('z / Ang')
+        plt.legend(loc=0, prop=font)
+
+        plt.suptitle('%s \n\n Reflectivity data and fit, residuals and profile' % (plotname))
+        plt.savefig('%s_fit.png' % plotname, format='png')
+        plt.show()
+        # plt.close()
 
     def fnLoadData(self, filename):
         """
