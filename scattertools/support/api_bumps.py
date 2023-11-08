@@ -158,7 +158,7 @@ class CBumpsAPI(api_base.CBaseAPI):
 
             seed()
             for j in range(len(points[:, 0])):
-                if dSparse == 0 or (dSparse > 1 and j < dSparse) or (1 > dSparse > random()):
+                if dSparse == 0 or (dSparse > 1 and j < dSparse) or (1 >= dSparse > random()):
                     diStatRawData["Parameters"]["Chisq"]["Values"].append(logp[j])
                     for i, parname in enumerate(lParName):
                         diStatRawData["Parameters"][parname]["Values"].append(points[j, i])
