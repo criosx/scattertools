@@ -890,7 +890,7 @@ if __name__ == '__main__':
             elif argv[i] == '-aprof':
                 AvgProfile()
             elif argv[i] == '-bilayerplot':
-                ReflPar.fnCreateBilayerPlotData()
+                ReflPar.corrected_bilayer_plot()
             elif argv[i] == '-cm':
                 iCm = 1
                 sMolgroup = argv[i + 1]

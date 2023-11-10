@@ -2,6 +2,7 @@ from __future__ import print_function
 from math import sqrt
 from os import path
 from scipy import stats, special
+import matplotlib.pyplot as plt
 import numpy
 import pandas
 import os
@@ -49,7 +50,7 @@ class CMolStat:
                                  'relval' : float        # relative value between 0 and 1 in terms of the constraints
                                  'variable': string       # associated ga_refl variable
 
-        self.diStatRestuls is a dictionary of statistical results with entries from various routines:
+        self.diStatResults is a dictionary of statistical results with entries from various routines:
             (from fnAnalyzeStatFile)
             'Parameters' is itself a dictionary with the following keys:
                       'Values' key contains ordered list of all MCMC parameters
@@ -327,6 +328,240 @@ class CMolStat:
             reported = 0.5 * (onesigmam + onesigmap)
             return [twosigmam, onesigmam, reported, onesigmap, twosigmap]
 
+    def corrected_bilayer_plot(self, plot_list=None, plot_uncertainties=None, plot=True):
+
+        if plot_list is None:
+            plot_list = ['substrate', 'siox', 'tether', 'innerhg', 'innerhc', 'outerhc', 'outerhg', 'protein', 'sum',
+                         'water']
+        if plot_uncertainties is None:
+            plot_uncertainties = ['protein']
+
+        # integrate over 1D array
+        def fnIntegrate(axis, array, start, stop):
+            idx_min = numpy.argmin(numpy.abs(axis - start))
+            idx_max = numpy.argmin(numpy.abs(axis - stop)) + 1
+            if idx_max > axis.shape[0]:
+                idx_max = axis.shape[0]
+            result = numpy.trapz(array[idx_min:idx_max], x=axis[idx_min:idx_max])
+            return result
+
+        # find maximum values and indizees of half-height points assuming unique solution and steady functions
+        def fnMaximumHalfPoint(data):
+            maximum = numpy.amax(data)
+            point1 = False
+            point2 = False
+            hm1 = 0
+            hm2 = 0
+            for i in range(len(data)):
+                if data[i] > (maximum / 2) and not point1:
+                    point1 = True
+                    hm1 = i
+                if data[i] < (maximum / 2) and not point2:
+                    point2 = True
+                    hm2 = i - 1
+                    i = len(data)
+            return maximum, hm1, hm2
+
+        def fnStat(area, name, diStat):
+            diStat[name + '_msigma'] = numpy.percentile(area, q=16., axis=0)
+            diStat[name] = numpy.percentile(area, q=50., axis=0)
+            diStat[name + '_psigma'] = numpy.percentile(area, q=84., axis=0)
+
+        # initialize Statistical Dictionary
+        print('Initializing ...')
+        lGroupList = ['substrate', 'siox', 'tether', 'innerhg', 'innerhc', 'outerhc', 'outerhg', 'protein',
+                      'sum', 'water']
+        diStat = {}
+        for element in lGroupList:
+            diStat[element] = None
+            diStat[element + '_corr'] = None
+            diStat[element + '_cvo'] = None
+            diStat[element + '_corr_cvo'] = None
+
+        keylist = list(diStat)
+        for element in keylist:
+            diStat[element + '_msigma'] = None
+            diStat[element + '_psigma'] = None
+
+        diIterations = {}
+        for element in lGroupList:
+            diIterations[element] = None
+            diIterations[element + '_corr'] = None
+            diIterations[element + '_cvo'] = None
+            diIterations[element + '_corr_cvo'] = None
+
+        # pull all relevant molgroups
+        # headgroups are allready corrected for protein penetration (_corr) and will be copied over to the _corr
+        # entries next
+
+        i = 1
+        mollist_innerhg = []
+        mollist_innerhc = []
+        mollist_outerhc = []
+        mollist_outerhg = []
+        while 'bilayer.headgroup1_' + str(i) in self.diStatResults['Molgroups']:
+            mollist_innerhg.append('bilayer.headgroup1_' + str(i))
+            mollist_innerhc.extend(['bilayer.methylene1_'+str(i), 'bilayer.methyl1_'+str(i)])
+            mollist_outerhc.extend(['bilayer.methylene2_'+str(i), 'bilayer.methyl2_'+str(i)])
+            mollist_outerhg.append('bilayer.headgroup2_' + str(i))
+            i += 1
+
+        print('Pulling all molgroups ...')
+        print('  substrate ...')
+        _, diIterations['substrate'], _, _ = self.molgroup_loader(['bilayer.substrate'])
+        print('  siox ...')
+        _, diIterations['siox'], _, _ = self.molgroup_loader(['bilayer.siox'])
+        print('  tether ...')
+        _, diIterations['tether'], _, _ = self.molgroup_loader(['bilayer.bME', 'bilayer.tetherg', 'bilayer.tether'])
+        print('  innerhg ...')
+        _, diIterations['innerhg'], __, __ = self.molgroup_loader(mollist_innerhg)
+        print('  innerhc ...')
+        _, diIterations['innerhc'], __, __ = self.molgroup_loader(mollist_innerhc)
+        print('  outerhc ...')
+        _, diIterations['outerhc'], __, __ = self.molgroup_loader(mollist_outerhc)
+        print('  outerhg ...')
+        _, diIterations['outerhg'], __, __ = self.molgroup_loader(mollist_outerhg)
+        print('  protein ...')
+        # save z-axis
+        diStat['zaxis'], diIterations['protein'], __, __ = self.molgroup_loader(['protein'])
+
+        diIterations['sum'] = numpy.zeros_like(diIterations['substrate'])
+        diIterations['water'] = numpy.zeros_like(diIterations['substrate'])
+
+        # shallow copies of the uncorrected data into the corrected dictionaries
+        # and the values will be replaced by their modifications step by step
+        for element in lGroupList:
+            diIterations[element + '_corr'] = diIterations[element].copy()
+            diIterations[element + '_cvo'] = diIterations[element].copy()
+            diIterations[element + '_corr_cvo'] = diIterations[element].copy()
+
+        # loop over all iterations and apply the corrections / calculations
+        print('Applying corrections ...\n')
+        for i in range(diIterations['substrate'].shape[0]):
+            substrate = diIterations['substrate'][i]
+            siox = diIterations['siox'][i]
+            tether = diIterations['tether'][i]
+            innerhg_corr = diIterations['innerhg_corr'][i]
+            innerhc = diIterations['innerhc'][i]
+            outerhc = diIterations['outerhc'][i]
+            outerhg_corr = diIterations['outerhg_corr'][i]
+            protein = diIterations['protein'][i]
+            axis = diStat['zaxis']
+
+            hc = innerhc + outerhc
+            # this is the sum as used for the joining procedure
+            sum = substrate + siox + tether + innerhg_corr + hc + outerhg_corr
+
+            areaperlipid, _, _ = fnMaximumHalfPoint(substrate)
+            maxbilayerarea, _, _ = fnMaximumHalfPoint(hc)
+            # vf_bilayer = maxbilayerarea/areaperlipid
+
+            # recuperate the non-corrected headgroup distributions that were not saved to file by the fit
+            # by reversing the multiplication based on the amount of replaced hc material
+            __, hc1_hm1, hc1_hm2 = fnMaximumHalfPoint(innerhc)
+            __, hc2_hm1, hc2_hm2 = fnMaximumHalfPoint(outerhc)
+            hg1ratio = fnIntegrate(axis, protein, axis[hc1_hm1], axis[hc1_hm2]) \
+                       / fnIntegrate(axis, innerhc, axis[hc1_hm1], axis[hc1_hm2])
+            hg2ratio = fnIntegrate(axis, protein, axis[hc2_hm1], axis[hc2_hm2]) \
+                       / fnIntegrate(axis, outerhc, axis[hc2_hm1], axis[hc2_hm2])
+            innerhg = innerhg_corr / (1 - hg1ratio)
+            diIterations['innerhg'][i] = numpy.copy(innerhg)
+            outerhg = outerhg_corr / (1 - hg2ratio)
+            diIterations['outerhg'][i] = numpy.copy(outerhg)
+
+            # prepare arrays for correction
+            innerhc_corr = numpy.copy(innerhc)
+            outerhc_corr = numpy.copy(outerhc)
+
+            # correct the hc profiles due to protein penetration
+            for j in range(len(protein)):
+                if sum[j] + protein[j] > maxbilayerarea:
+                    if (innerhc[j] + outerhc[j]) > 0:
+                        excess = sum[j] + protein[j] - maxbilayerarea
+                        if excess > (innerhc[j] + outerhc[j]):
+                            excess = (innerhc[j] + outerhc[j])
+                        # print (innerhc[i]+outerhc[i]) > 0, i
+                        # print 'first' , innerhc_corr[i], excess, innerhc[i], outerhc[i],
+                        # excess*innerhc[i]/(innerhc[i]+outerhc[i])
+                        innerhc_corr[j] -= excess * innerhc[j] / (innerhc[j] + outerhc[j])
+                        # print 'second' , outerhc_corr[i], excess, innerhc[i], outerhc[i],
+                        # excess*outerhc[i]/(innerhc[i]+outerhc[i])
+                        outerhc_corr[j] -= excess * outerhc[j] / (innerhc[j] + outerhc[j])
+
+            # update dictionary entries for later statistics
+            diIterations['innerhc_corr'][i] = numpy.copy(innerhc_corr)
+            diIterations['outerhc_corr'][i] = numpy.copy(outerhc_corr)
+            sum_corr = substrate + siox + tether + innerhg_corr + innerhc_corr + outerhc_corr + outerhg_corr + protein
+            diIterations['sum_corr'][i] = numpy.copy(sum_corr)
+
+            # this is the truly non-corrected sum, different from the previous sum used for joining
+            sum = substrate + siox + tether + innerhg + innerhc + outerhc + outerhg + protein
+            diIterations['sum'][i] = numpy.copy(sum)
+            water_corr = areaperlipid - sum_corr
+            diIterations['water_corr'][i] = numpy.copy(water_corr)
+            water = areaperlipid - sum
+            diIterations['water'][i] = numpy.copy(water)
+
+            # calculate volume occupancy distributions by division by the area per lipid
+            for element in lGroupList:
+                diIterations[element + '_cvo'][i] = diIterations[element][i] / areaperlipid
+                diIterations[element + '_corr_cvo'][i] = diIterations[element + '_corr'][i] / areaperlipid
+
+        # calculate the statisics
+        print('Calculating statistics ...\n')
+        for element in lGroupList:
+            if element != 'zaxis':
+                fnStat(diIterations[element], element, diStat)
+                fnStat(diIterations[element + '_corr'], element + '_corr', diStat)
+                fnStat(diIterations[element + '_cvo'], element + '_cvo', diStat)
+                fnStat(diIterations[element + '_corr_cvo'], element + '_corr_cvo', diStat)
+
+        print('Saving data to bilayerplotdata.dat ...\n')
+        self.Interactor.fnSaveSingleColumns('bilayerplotdata.dat', diStat)
+
+        if plot:
+            fig, ax = plt.subplots()
+            for gp in plot_list:
+                if gp + '_corr_cvo' in diStat:
+                    zaxis = diStat['zaxis']
+                    area = diStat[gp+'_corr_cvo']
+                    ax.plot(zaxis, area, label=gp)
+                    if gp in plot_uncertainties:
+                        msigma = diStat[gp + '_corr_cvo_msigma']
+                        psigma = diStat[gp + '_corr_cvo_psigma']
+                        ax.fill_between(zaxis, msigma, psigma, alpha=0.3)
+                elif gp in self.diStatResults['Molgroups']:
+                    zaxis = self.diStatResults['Molgroups'][gp]['zaxis']
+                    area = self.diStatResults['Molgroups'][gp]['median area']
+                    ax.plot(zaxis, area, label=gp)
+                    if gp in plot_uncertainties:
+                        msigma = self.diStatResults['Molgroups'][gp]['msigma area']
+                        psigma = self.diStatResults['Molgroups'][gp]['psigma area']
+                        ax.fill_between(zaxis, msigma, psigma, alpha=0.3)
+
+            ax.legend(loc="upper right")
+            plt.xlabel("Distance (Å)")
+            plt.ylabel("Area (Å)")
+            ax.minorticks_on()
+            ax.tick_params(which="both", direction="in", labelsize=10)
+            ax.tick_params(bottom=True, top=True, left=True, right=True, which="both")
+            # plt.xlim(0, 100)
+            # plt.xticks(numpy.arange(-35, 36, 5.0))
+            plt.grid(True, which='Both')
+            fig.patch.set_facecolor('white')
+            ax.figure.set_size_inches(10, 6.66)
+            plt.savefig(os.path.join(self.spath, self.mcmcpath, 'cvo_corr.png'), facecolor="white")
+            plt.show()
+
+    def draw_sample(self, parlist=None):
+        if self.diStatResults == {} or parlist is None:
+            return None
+        iteration = numpy.random.randint(0, self.diStatResults['NumberOfStatValues'])
+        retval = []
+        for par in parlist:
+            retval.append(self.diStatResults['Parameters'][par]['Values'][iteration])
+        return retval
+
     def fnGetChiSq(self):  # export chi squared
         return self.chisq
 
@@ -572,7 +807,7 @@ class CMolStat:
         2 sigma intervals are put out in pulledmolgroupsstat.dat.
         Save results to file
         """
-        diarea, dinsl, dinsld = self.fnPullMolgroupLoader(liMolgroupNames, sparse, verbose=verbose)
+        diarea, dinsl, dinsld = self.molgroup_loader(liMolgroupNames, sparse, verbose=verbose)
         diStat = dict(zaxis=[], m2sigma_area=[], msigma_area=[], median_area=[], psigma_area=[], p2sigma_area=[],
                       m2sigma_nsl=[], msigma_nsl=[], median_nsl=[], psigma_nsl=[], p2sigma_nsl=[],
                       m2sigma_nsld=[], msigma_nsld=[], median_nsld=[], psigma_nsld=[], p2sigma_nsld=[])
@@ -608,7 +843,7 @@ class CMolStat:
         self.Interactor.fnSaveSingleColumns(self.mcmcpath + '/pulledmolgroups_nsld.dat', dinsld)
         self.Interactor.fnSaveSingleColumns(self.mcmcpath + '/pulledmolgroupsstat.dat', diStat)
 
-    def fnPullMolgroupLoader(self, liMolgroupNames, sparse=0, verbose=True):
+    def molgroup_loader(self, liMolgroupNames, sparse=0):
         """
         Function recreates statistical data and extracts only area and nSL profiles for
         submolecular groups whose names are given in liMolgroupNames. Those groups
@@ -620,34 +855,25 @@ class CMolStat:
         if self.diStatResults == {}:
             self.fnLoadStatData()
 
-        zaxis = self.diStatResults['Molgroups'][0][list(self.diStatResults['Molgroups'][0].keys())[0]]['zaxis']
-        diarea = {'zaxis': zaxis}
-        dinsl = {'zaxis': zaxis}
-        dinsld = {'zaxis': zaxis}
+        zaxis = numpy.array(self.diStatResults['Molgroups'][list(self.diStatResults['Molgroups'].keys())[0]]['zaxis'])
+        area = numpy.zeros_like(self.diStatResults['Molgroups'][list(self.diStatResults['Molgroups'].keys())[0]]
+                                ['area'])
+        sl = numpy.zeros_like(area)
+        sld = numpy.zeros_like(area)
 
-        for i, iteration in enumerate(self.diStatResults['Molgroups']):
-            # add together all the molgroups that have to be analyzed
-            sumareaprofile = numpy.zeros_like(zaxis)
-            sumnslprofile = numpy.zeros_like(zaxis)
+        for gp in liMolgroupNames:
+            if gp in self.diStatResults['Molgroups']:
+                area_gp = numpy.array(self.diStatResults['Molgroups'][gp]['area'])
+                area += area_gp
+                sl_gp = numpy.array(self.diStatResults['Molgroups'][gp]['sl'])
+                sl += sl_gp
+                sld += numpy.array(self.diStatResults['Molgroups'][gp]['sld']) * area_gp
+            else:
+                print(f'Molecular group {gp} does not exist.')
 
-            for molgroup in liMolgroupNames:
-                if molgroup in iteration:
-                    sumareaprofile += iteration[molgroup]['areaaxis']
-                    sumnslprofile += iteration[molgroup]['nslaxis']
-                elif i == 0 and verbose:
-                    print(f'Molecular group {molgroup} does not exist.')
+        sld = sld / area
 
-                diarea[f'iter{i}'] = sumareaprofile
-                dinsl[f'iter{i}'] = sumnslprofile
-                stepsize = diarea['zaxis'][1] - diarea['zaxis'][0]
-                dinsld[f'iter{i}'] = []
-                for j in range(len(diarea[f'iter{i}'])):
-                    if diarea[f'iter{i}'][j] != 0:
-                        dinsld[f'iter{i}'].append(dinsl[f'iter{i}'][j] / diarea[f'iter{i}'][j] / stepsize)
-                    else:
-                        dinsld[f'iter{i}'].append(0.0)
-
-        return diarea, dinsl, dinsld
+        return zaxis, area, sl, sld
 
     def fnRestoreFit(self):
         self.Interactor.fnRestoreFit()
