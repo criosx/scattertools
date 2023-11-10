@@ -50,7 +50,7 @@ class CMolStat:
                                  'relval' : float        # relative value between 0 and 1 in terms of the constraints
                                  'variable': string       # associated ga_refl variable
 
-        self.diStatRestuls is a dictionary of statistical results with entries from various routines:
+        self.diStatResults is a dictionary of statistical results with entries from various routines:
             (from fnAnalyzeStatFile)
             'Parameters' is itself a dictionary with the following keys:
                       'Values' key contains ordered list of all MCMC parameters
@@ -335,6 +335,7 @@ class CMolStat:
                          'water']
         if plot_uncertainties is None:
             plot_uncertainties = ['protein']
+
         # integrate over 1D array
         def fnIntegrate(axis, array, start, stop):
             idx_min = numpy.argmin(numpy.abs(axis - start))
@@ -551,6 +552,15 @@ class CMolStat:
             ax.figure.set_size_inches(10, 6.66)
             plt.savefig(os.path.join(self.spath, self.mcmcpath, 'cvo_corr.png'), facecolor="white")
             plt.show()
+
+    def draw_sample(self, parlist=None):
+        if self.diStatResults == {} or parlist is None:
+            return None
+        iteration = numpy.random.randint(0, self.diStatResults['NumberOfStatValues'])
+        retval = []
+        for par in parlist:
+            retval.append(self.diStatResults['Parameters'][par]['Values'][iteration])
+        return retval
 
     def fnGetChiSq(self):  # export chi squared
         return self.chisq
