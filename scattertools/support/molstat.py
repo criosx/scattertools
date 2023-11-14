@@ -405,6 +405,8 @@ class CMolStat:
             mollist_outerhc.extend(['bilayer.methylene2_'+str(i), 'bilayer.methyl2_'+str(i)])
             mollist_outerhg.append('bilayer.headgroup2_' + str(i))
             i += 1
+        mollist_innerhc.append('bilayer.tether_methylene')
+        mollist_innerhc.append('bilayer.tether_methyl')
 
         print('Pulling all molgroups ...')
         print('  substrate ...')
@@ -412,7 +414,8 @@ class CMolStat:
         print('  siox ...')
         _, diIterations['siox'], _, _ = self.molgroup_loader(['bilayer.siox'])
         print('  tether ...')
-        _, diIterations['tether'], _, _ = self.molgroup_loader(['bilayer.bME', 'bilayer.tetherg', 'bilayer.tether'])
+        _, diIterations['tether'], _, _ = self.molgroup_loader(['bilayer.bME', 'bilayer.tether_bme',
+                                                                'bilayer.tether_free', 'bilayer.tether_hg'])
         print('  innerhg ...')
         _, diIterations['innerhg'], __, __ = self.molgroup_loader(mollist_innerhg)
         print('  innerhc ...')
@@ -541,7 +544,7 @@ class CMolStat:
 
             ax.legend(loc="upper right")
             plt.xlabel("Distance (Å)")
-            plt.ylabel("Area (Å)")
+            plt.ylabel("Component Volume Occupancy")
             ax.minorticks_on()
             ax.tick_params(which="both", direction="in", labelsize=10)
             ax.tick_params(bottom=True, top=True, left=True, right=True, which="both")
@@ -871,7 +874,7 @@ class CMolStat:
             else:
                 print(f'Molecular group {gp} does not exist.')
 
-        sld = sld / area
+        sld = numpy.divide(sld, area, out=numpy.zeros_like(sld), where=area != 0)
 
         return zaxis, area, sl, sld
 
