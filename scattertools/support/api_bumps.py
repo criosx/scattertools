@@ -291,7 +291,8 @@ class CBumpsAPI(api_base.CBaseAPI):
         z, rho, irho = M.sld, [], []
         return z, rho, irho
 
-    def fnRunMCMC(self, burn=8000, steps=500, batch=False, fitter='MCMC', reload_problem=True, resume=False):
+    def fnRunMCMC(self, burn=8000, steps=500, batch=False, fitter='MCMC', reload_problem=True, resume=False,
+                  alpha=0.01):
         """
         Runs fit for Bumps object.
 
@@ -303,41 +304,9 @@ class CBumpsAPI(api_base.CBaseAPI):
                                problem is used, including any potential best-fit parameters from a previous run or
                                restore.
         :param resume: if True, resumes a fit from the store directory
+        :param alpha: Dream convergence criterion
         :return: no return value
         """
-
-        # Original Method of Calling the Shell
-        '''
-        lCommand = ['refl1d', os.path.join(self.spath, self.runfile)+'.py', '--fit=dream', '--parallel', '--init=lhs']
-        if batch:
-           lCommand.append('--batch')
-        lCommand.append('--store=' + self.mcmcpath)
-        lCommand.append('--burn=' + str(burn))
-        lCommand.append('--steps=' + str(steps))
-        lCommand.append('--overwrite')
-        call(lCommand)
-        '''
-
-        # Command line Python implementation
-        '''
-        from refl1d import main
-        # There is a bug in bumps that prevents running sequential fits because the pool object is terminated
-        # from a previous fit but not None. Bumps expects it to be None or will not initiate a new pool.        
-        if none_pool:
-            from bumps.mapper import MPMapper
-            # MPMapper.pool.terminate()  # not always required
-            MPMapper.pool = None
-
-        sys.argv = ['refl1d', os.path.join(self.spath, self.runfile)+'.py', '--fit=dream', '--parallel', '--init=lhs']
-        if batch:
-            sys.argv.append('--batch')
-        sys.argv.append('--store=' + self.mcmcpath)
-        sys.argv.append('--burn=' + str(burn))
-        sys.argv.append('--steps=' + str(steps))
-        sys.argv.append('--overwrite')
-
-        main.cli()
-        '''
 
         # Calling bumps functions directl
         model_file = os.path.join(self.spath, self.runfile) + '.py'
@@ -357,7 +326,7 @@ class CBumpsAPI(api_base.CBaseAPI):
 
         if fitter == 'MCMC':
             driver = FitDriver(fitclass=DreamFit, mapper=mapper, problem=self.problem, init='lhs', steps=steps,
-                               burn=burn, monitors=monitors, xtol=1e-6, ftol=1e-8)
+                               burn=burn, monitors=monitors, xtol=1e-6, ftol=1e-8, alpha=alpha)
         elif fitter == 'LM':
             driver = FitDriver(fitclass=MPFit, mapper=mapper, problem=self.problem, monitors=monitors,
                                steps=steps, xtol=1e-6, ftol=1e-8)

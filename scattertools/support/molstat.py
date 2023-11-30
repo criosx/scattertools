@@ -881,7 +881,7 @@ class CMolStat:
     def fnRestoreFit(self):
         self.Interactor.fnRestoreFit()
 
-    def fnRunFit(self, burn=2000, steps=500, batch=False, resume=False):
+    def fnRunFit(self, burn=2000, steps=500, batch=False, resume=False, alpha=0.01):
         path1 = os.path.join(self.spath, self.mcmcpath)
         if os.path.isfile(os.path.join(path1, "sErr.dat")):
             os.remove(os.path.join(path1, "sErr.dat"))
@@ -889,7 +889,7 @@ class CMolStat:
             os.remove(os.path.join(path1,  "isErr.dat"))
         if os.path.isfile(os.path.join(path1,  "StatDataPython.dat")):
             os.remove(os.path.join(path1,  "StatDataPython.dat"))
-        self.Interactor.fnRunMCMC(burn, steps, batch=batch, resume=resume)
+        self.Interactor.fnRunMCMC(burn, steps, batch=batch, resume=resume, alpha=alpha)
 
     @staticmethod
     def fnSaveObject(save_object, sFileName):
