@@ -5,7 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/scattertools" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/dist" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.9 (Python39)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="refl1d" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">
