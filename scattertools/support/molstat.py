@@ -709,17 +709,11 @@ class CMolStat:
                             self.diStatResults['Results'][origin][name].append(self.diResults[origin][name])
 
                 # distinguish between FitProblem and MultiFitProblem
-                if 'models' in dir(problem):
-                    for M in problem.models:
-                        if not isinstance(M.fitness, bumps.curve.Curve):
-                            z, rho, irho = self.Interactor.fnRestoreSmoothProfile(M)
-                            self.diStatResults['nSLDProfiles'].append((z, rho, irho))
-                            # only report SLD profile for first model
-                            break
-                else:
-                    z, rho, irho = self.Interactor.fnRestoreSmoothProfile(problem)
+                for M in problem.models:
+                    z, rho, irho = self.Interactor.fnRestoreSmoothProfile(M)
                     self.diStatResults['nSLDProfiles'].append((z, rho, irho))
-
+                    # only report SLD profile for first model
+                    break
 
             finally:
                 j += 1
