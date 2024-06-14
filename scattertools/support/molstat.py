@@ -677,7 +677,7 @@ class CMolStat:
                 # TODO: By calling .chisq() I currently force an update of the BLM function. There must be a better
                 #   way, also implement which contrast to use for pulling groups garefl based code should save a
                 #   mol.dat automatically on updating the model
-                    _ problem.chisq_str()
+                    _ = problem.chisq_str()
 
                 # Recreate Molgroups and Derived Results
                 self.diMolgroups, self.diResults = self.Interactor.fnLoadMolgroups(problem)
