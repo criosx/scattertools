@@ -96,21 +96,9 @@ class CBumpsAPI(api_base.CBaseAPI):
         # from bumps.cli import load_best
         # load_best(problem, os.path.join(self.mcmcpath, self.runfile) + '.par')
 
-        # distinguish between fitproblem and multifitproblem
-        if "models" in dir(self.problem):
-            i = 0
-            overall = 0.0
-            for M in self.problem.models:
-                overall += M.chisq()
-                i += 1
-            overall /= float(i)
-            pnamekeys = []
-            pars = self.problem._parameters
-            for par in pars:
-                pnamekeys.append(par.name)
-        else:
-            overall = self.problem.chisq()
-            pnamekeys = self.problem.labels()
+        self.problem.model_update()
+        overall = self.problem.fitness()
+        pnamekeys = self.problem.labels()
 
         # Do not accept parameter names with spaces, replace with underscore
         for i in range(len(pnamekeys)):
