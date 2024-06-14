@@ -97,7 +97,7 @@ class CBumpsAPI(api_base.CBaseAPI):
         # load_best(problem, os.path.join(self.mcmcpath, self.runfile) + '.par')
 
         self.problem.model_update()
-        overall = self.problem.fitness()
+        overall = self.problem.chisq_str()
         pnamekeys = self.problem.labels()
 
         # Do not accept parameter names with spaces, replace with underscore
