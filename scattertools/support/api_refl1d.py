@@ -167,7 +167,7 @@ class CRefl1DAPI(api_bumps.CBumpsAPI):
 
     @staticmethod
     def fnRestoreSmoothProfile(M):
-        z, rho, irho = M.fitness.smooth_profile()
+        z, rho, irho = M.smooth_profile()
         return z, rho, irho
 
     def fnSaveData(self, basefilename, liData):
