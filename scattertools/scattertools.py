@@ -1036,7 +1036,25 @@ def fnWrap(limit=20.905,refaxis='z'):
         data[element]=temp[:]
 
 
-    fnSaveSingleColumns("dmpc_liq_135ns_byatom_wrapped.txt", data)
+def parse_uncertain_number(uncertain_number):
+    """
+    Parses a chisq_str value from bumps.problem into median plus uncertainty
+    :param uncertain_number: the string reprensentation of chisq such as 2.135(23)
+    :return: (tuple) median, lower bound, upper bound
+    """
+    # Extract the median and uncertainty using regular expressions
+    match = re.match(r"(\d+\.\d+)\((\d+)\)", uncertain_number)
+    if match:
+        central_value = float(match.group(1))
+        uncertainty = float(match.group(2)) * 10 ** -len(match.group(1).split('.')[1])
+
+        # Calculate lower and upper bounds
+        lower_bound = central_value - uncertainty
+        upper_bound = central_value + uncertainty
+
+        return central_value, lower_bound, upper_bound
+    else:
+        raise ValueError("Input string is not in the expected format")
 
 
 
