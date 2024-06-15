@@ -342,10 +342,10 @@ class CBumpsAPI(api_base.CBaseAPI):
         # don't know what files
         if 'models' in dir(self.problem):
             for M in self.problem.models:
-                M.fitness.save(os.path.join(mcmcpath, self.runfile))
+                M.save(os.path.join(mcmcpath, self.runfile))
                 break
         else:
-            self.problem.fitness.save(os.path.join(mcmcpath, self.runfile))
+            self.problem.save(os.path.join(mcmcpath, self.runfile))
 
         # .mcmc and .point files
         driver.save(os.path.join(mcmcpath, self.runfile))
