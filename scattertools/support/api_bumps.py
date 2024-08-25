@@ -274,10 +274,12 @@ class CBumpsAPI(api_base.CBaseAPI):
         return state
 
     def fnRestoreSmoothProfile(self, M):
-        # TODO: Decide what and if to return SLD profile for Bumps fits
-        # Returns currently profile for zeroth model if multiproblem fit
-        z, rho, irho = M.sld, [], []
-        return z, rho, irho
+        if hasattr(M, 'z') and hasattr(M, 'rho') and hasattr(M, 'irho'):
+            return M.z, M.rho, M.irho
+        elif hasattr(M, 'x') and hasattr(M, 'theory'):
+            return M.x, M.theory(), numpy.zeros_like(M.x)
+        else:
+            return None, None, None
 
     def fnRunMCMC(self, burn=8000, steps=500, batch=False, fitter='MCMC', reload_problem=True, resume=False,
                   alpha=0.01):
