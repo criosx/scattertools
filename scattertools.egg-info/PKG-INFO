@@ -1,4 +1,4 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: scattertools
 Version: 0.9
 Summary: Data analysis, experimental optimization, and machine learning for neutron and x-ray scattering.
@@ -7,3 +7,9 @@ Author: Frank Heinrich
 Author-email: mail@frank-heinrich.net
 License: MIT Permissive License
 License-File: LICENSE
+Dynamic: author
+Dynamic: author-email
+Dynamic: home-page
+Dynamic: license
+Dynamic: license-file
+Dynamic: summary

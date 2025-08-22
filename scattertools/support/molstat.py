@@ -9,6 +9,8 @@ import os
 import shutil
 import bumps.curve
 
+from . import api_bumps
+
 
 def prepare_fit_directory(fitdir=None, runfile=None, datafile_names=None):
     """
@@ -677,11 +679,8 @@ class CMolStat:
                 # TODO: By calling .chisq() I currently force an update of the BLM function. There must be a better
                 #   way, also implement which contrast to use for pulling groups garefl based code should save a
                 #   mol.dat automatically on updating the model
-                if 'models' in dir(problem):
-                    for M in problem.models:
-                        M.chisq()
-                else:
-                    problem.chisq()
+                # Note: model_update should trigger the model to clear all caches, so we shouldn't need problem.chisq()
+                problem.chisq()
 
                 # Recreate Molgroups and Derived Results
                 self.diMolgroups, self.diResults = self.Interactor.fnLoadMolgroups(problem)
@@ -712,18 +711,12 @@ class CMolStat:
                                 self.diStatResults['Results'][origin][name] = []
                             self.diStatResults['Results'][origin][name].append(self.diResults[origin][name])
 
-                # distinguish between FitProblem and MultiFitProblem
-                if 'models' in dir(problem):
-                    for M in problem.models:
-                        if not isinstance(M.fitness, bumps.curve.Curve):
-                            z, rho, irho = self.Interactor.fnRestoreSmoothProfile(M)
-                            self.diStatResults['nSLDProfiles'].append((z, rho, irho))
-                            # only report SLD profile for first model
-                            break
-                else:
-                    z, rho, irho = self.Interactor.fnRestoreSmoothProfile(problem)
-                    self.diStatResults['nSLDProfiles'].append((z, rho, irho))
-
+                for M in api_bumps.iter_models(problem):
+                    if not isinstance(M, bumps.curve.Curve):
+                        z, rho, irho = self.Interactor.fnRestoreSmoothProfile(M)
+                        self.diStatResults['nSLDProfiles'].append((z, rho, irho))
+                        # only report SLD profile for first model
+                        break
 
             finally:
                 j += 1
