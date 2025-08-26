@@ -448,6 +448,17 @@ def fMCMultiCore(iIterations=1000, fMCConvergence=0.01, iConvergence=0.01,
 
 
 def fMCMC(iMaxIterations=1024000, liMolgroups=['protein'], fSparse=0):
+
+    # Bumps V0: --store=new --resume=old
+    # Bumps V1: --write-session=new.h5 --export=new --read-session=old.h5 --resume
+    try:
+        from bumps.webview.server.cli import BumpsOptions
+        bumps_version = 1
+        # Note: renamed --*store to --*session around bumps 1.0.4
+        session = "session" if hasattr(BumpsOptions, 'session') else "store"
+    except ImportError:
+        bumps_version = 0
+
     while True:
         if not path.isfile('run.py'):  # make sure there is a run.py
             with open('run.py', 'w') as file:
@@ -468,19 +479,39 @@ def fMCMC(iMaxIterations=1024000, liMolgroups=['protein'], fSparse=0):
                 bMCMCexists = True
                 break
 
-        lCommand = ['refl1d_cli.py', 'run.py', '--fit=dream', '--parallel=0']
-        if bMCMCexists:
-            if iBurn >= iMaxIterations:
-                print('Maximum number of MCMC iterations reached\n')
-                break  # end
-            lCommand.append(f'--resume=MCMC_{iBurn}_500')
-            lCommand.append(f'--store=MCMC_{iBurn*2}_500')
-            lCommand.append(f'--burn={iBurn}')
+        if bumps_version >= 1:
+
+            lCommand = ['refl1d', 'run.py', '--fit=dream', '--parallel=0']
+            if bMCMCexists:
+                if iBurn >= iMaxIterations:
+                    print('Maximum number of MCMC iterations reached\n')
+                    break  # end
+                lCommand.append(f'--read-{session}=MCMC_{iBurn}_500.h5')
+                lCommand.append('--resume')
+                lCommand.append(f'--burn={iBurn}')
+            else:
+                lCommand.append('--init=lhs')
+                lCommand.append('--burn=8000')
+                iBurn = 4000
+            lCommand.append(f'--export=MCMC_{iBurn*2}_500')
+            lCommand.append(f'--write-{session}=MCMC_{iBurn*2}_500.h5')
+            lCommand.append('--batch')
+
         else:
-            lCommand.append('--init=lhs')
-            lCommand.append('--store=MCMC_8000_500')
-            lCommand.append('--burn=8000')
-            iBurn = 4000
+
+            lCommand = ['refl1d_cli.py', 'run.py', '--fit=dream', '--parallel=0']
+            if bMCMCexists:
+                if iBurn >= iMaxIterations:
+                    print('Maximum number of MCMC iterations reached\n')
+                    break  # end
+                lCommand.append(f'--resume=MCMC_{iBurn}_500')
+                lCommand.append(f'--store=MCMC_{iBurn*2}_500')
+                lCommand.append(f'--burn={iBurn}')
+            else:
+                lCommand.append('--init=lhs')
+                lCommand.append('--store=MCMC_8000_500')
+                lCommand.append('--burn=8000')
+                iBurn = 4000
 
         lCommand.append('--steps=500')
 
@@ -501,6 +532,8 @@ def fMCMC(iMaxIterations=1024000, liMolgroups=['protein'], fSparse=0):
 
         if bMCMCexists:
             rmtree(f'MCMC_{iBurn}_500')
+            if os.path.exists(f'MCMC_{iBurn}_500.h5'):
+                os.remove(f'MCMC_{iBurn}_500.h5')
 
 def fMCPBS(iIterations, iConvergence=0.01, fConfidence=0.9546, sMode='is', iNodes=1,
            iIterationsPerCall='10', sQueue='default',
