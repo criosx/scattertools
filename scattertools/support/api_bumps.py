@@ -3,7 +3,11 @@ from os import path
 from random import seed, random
 from re import VERBOSE, IGNORECASE, compile
 from sys import stdout
+import shutil
+import glob
+import os
 
+import numpy
 import matplotlib
 from matplotlib import pyplot as plt
 
@@ -11,12 +15,45 @@ from bumps.cli import save_best
 from bumps.mapper import MPMapper
 from bumps.fitters import FitDriver, DreamFit, MPFit
 
-import numpy
-import shutil
-import glob
-import os
+from . import api_base
 
-from scattertools.support import api_base
+# CRUFT: bumps 1.0 changed problem.models from Iter[FitProblem] to Iter[Fitness]
+def iter_chisq(problem):
+    """
+    Iterate over chisq for each model.
+
+    Old bumps shimmered between FitProblem and MultiFitProblem, with
+    MultiFitProblem.models returning a sequence of FitProblem. New bumps
+    has only FitProblem with FitProblem.models returning a sequence of Fitness.
+    """
+    try:
+        from bumps.fitproblem import fitness_chisq
+    except ImportError:
+        def fitness_chisq(M):
+            raise NotImplementedError("chisq_iter is confused")
+    models_iter = getattr(problem, 'models', [problem])
+    for M in models_iter:
+        if hasattr(M, 'chisq'):
+            yield M.chisq()
+        else:
+            yield fitness_chisq(M)
+
+def iter_models(problem):
+    """
+    Iterate over fitness for each model.
+
+    Old bumps shimmered between FitProblem and MultiFitProblem, with
+    MultiFitProblem.models returning a sequence of FitProblem. New bumps
+    has only FitProblem with FitProblem.models returning a sequence of Fitness.
+    """
+    models_iter = getattr(problem, 'models', [problem.fitness])
+    for M in models_iter:
+        if hasattr(M, 'chisq'):  # iterating over FitProblem
+            # TODO: By calling .chisq() I currently force an update of the cost function. There must be a better way
+            # The model iterator should be triggering Fitness.model_update()
+            M.chisq()
+            M = M.fitness
+        yield M
 
 
 class CBumpsAPI(api_base.CBaseAPI):
@@ -96,21 +133,10 @@ class CBumpsAPI(api_base.CBaseAPI):
         # from bumps.cli import load_best
         # load_best(problem, os.path.join(self.mcmcpath, self.runfile) + '.par')
 
-        # distinguish between fitproblem and multifitproblem
-        if "models" in dir(self.problem):
-            i = 0
-            overall = 0.0
-            for M in self.problem.models:
-                overall += M.chisq()
-                i += 1
-            overall /= float(i)
-            pnamekeys = []
-            pars = self.problem._parameters
-            for par in pars:
-                pnamekeys.append(par.name)
-        else:
-            overall = self.problem.chisq()
-            pnamekeys = self.problem.labels()
+        # In bumps 1.0.4 the following could be written as:
+        #average_chisq = numpy.mean([fitness_chisq(M) for M in self.problem.models])
+        average_chisq = numpy.mean(list(iter_chisq(self.problem)))
+        pnamekeys = self.problem.labels()
 
         # Do not accept parameter names with spaces, replace with underscore
         for i in range(len(pnamekeys)):
@@ -137,7 +163,7 @@ class CBumpsAPI(api_base.CBaseAPI):
             # TODO: Do we still need this? Would have to figure out how to get the confidence limits from state
             self.diParameters[key]["error"] = 0.01
 
-        return self.diParameters, overall
+        return self.diParameters, average_chisq
 
     def fnLoadStatData(self, dSparse=0, rescale_small_numbers=True, skip_entries=None):
         if skip_entries is None:
@@ -346,18 +372,15 @@ class CBumpsAPI(api_base.CBaseAPI):
 
         # try to deal with matplotlib cache issues by deleting the cache
         fig = plt.figure()
+        # TODO: should this be fig.clear()?
         plt.figure().clear()
         plt.cla()
         plt.clf()
         plt.close("all")
 
-        # don't know what files
-        if 'models' in dir(self.problem):
-            for M in self.problem.models:
-                M.fitness.save(os.path.join(mcmcpath, self.runfile))
-                break
-        else:
-            self.problem.fitness.save(os.path.join(mcmcpath, self.runfile))
+        # Save the first (and only?) model
+        M = next(iter_models(self.problem))
+        M.save(os.path.join(mcmcpath, self.runfile))
 
         # .mcmc and .point files
         driver.save(os.path.join(mcmcpath, self.runfile))
@@ -376,7 +399,7 @@ class CBumpsAPI(api_base.CBaseAPI):
         try:
             problem.extra[0].fnWriteGroup2File(fp, 'bilayer', z)
             problem.extra[1].fnWriteGroup2File(fp, 'protein', z)
-        except:
+        except Exception:
             problem.extra.fnWriteGroup2File(fp, 'bilayer', z)
         fp.close()
         stdout.flush()

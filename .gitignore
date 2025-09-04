@@ -1,2 +1,33 @@
+# Build droppings
+*.so
+**/__pycache__/
+*.py[cod]
 /build/
 /dist/
+/*.egg-info/
+/EGG-INFO
+/.eggs
+refl1d/_version.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Test droppings
+.coverage
+.pytest_cache
+
+# Editor droppings
+.settings
+.ipynb_checkpoints
+.project
+.pydevproject
+.spyderproject
+.idea
+*.swp
+*.bak

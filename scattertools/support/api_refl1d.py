@@ -167,7 +167,7 @@ class CRefl1DAPI(api_bumps.CBumpsAPI):
 
     @staticmethod
     def fnRestoreSmoothProfile(M):
-        z, rho, irho = M.fitness.smooth_profile()
+        z, rho, irho = M.smooth_profile()
         return z, rho, irho
 
     def fnSaveData(self, basefilename, liData):
@@ -286,20 +286,10 @@ class CRefl1DAPI(api_bumps.CBumpsAPI):
     def fnSimulateData(self, diNewPars, liData, data_column='R'):
         self.fnUpdateModelPars(diNewPars)
 
-        # TODO: By calling .chisq() I currently force an update of the cost function. There must be a better way
-        if 'models' in dir(self.problem):
-            i = 0
-            for M in self.problem.models:
-                M.chisq()
-                qvec, scatt = M.fitness.reflectivity()
-                liData[i][1][data_column] = scatt
-                liData[i][1]['Q'] = qvec
-                i += 1
-        else:
-            self.problem.chisq()
-            qvec, scatt = self.problem.fitness.reflectivity()
-            liData[0][1][data_column] = scatt
-            liData[0][1]['Q'] = qvec
+        for i, M in enumerate(api_bumps.iter_models(self.problem)):
+            qvec, scatt = self.problem.reflectivity()
+            liData[i][1][data_column] = scatt
+            liData[i][1]['Q'] = qvec
 
         return liData
 

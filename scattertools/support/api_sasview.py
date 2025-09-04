@@ -211,21 +211,12 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
         if diNewPars is not None:
             self.fnUpdateModelPars(diNewPars)
 
-        # TODO: By calling .chisq() I currently force an update of the cost function. There must be a better way
-        if 'models' in dir(self.problem):
-            i = 0
-            for M in self.problem.models:
-                M.chisq()
-                scatt = M.fitness.theory()
-                if not isinstance(M.fitness, bumps.curve.Curve):
-                    # ignore Curve models, as they are sometimes used as auxiliary functions that do not contain
-                    # scattering data
-                    liData[i][1][data_column] = scatt
-                    i += 1
-        else:
-            self.problem.chisq()
-            scatt = self.problem.fitness.theory()
-            liData[0][1][data_column] = scatt
+        for i, M in enumerate(api_bumps.iter_models(self.problem)):
+            scatt = M.theory()
+            if not isinstance(M, bumps.curve.Curve):
+                # ignore Curve models, as they are sometimes used as auxiliary functions that do not contain
+                # scattering data
+                liData[i][1][data_column] = scatt
 
         return liData
 

@@ -9,8 +9,7 @@ import shutil
 import glob
 import os
 
-from scattertools.support import api_refl1d
-
+from . import api_refl1d
 
 
 class CGaReflAPI(api_refl1d.CRefl1DAPI):
@@ -336,13 +335,15 @@ class CGaReflAPI(api_refl1d.CRefl1DAPI):
         return problem
 
     def fnRestoreMolgroups(self, problem):
-        problem.active_model.fitness.output_model()
+        # CRUFT: bumps 1.0 changed problem.active_model from FitProblem to Fitness
+        active_model = getattr(problem.active_model, 'fitness', problem.active_model)
+        active_model.output_model()
         diMolgroups = self.fnLoadMolgroups()
         return diMolgroups
 
     @staticmethod
     def fnRestoreSmoothProfile(M):
-        z, rho, irho = M.fitness.smooth_profile()
+        z, rho, irho = M.smooth_profile()
         return z, rho, irho
 
     def fnRunMCMC(self, burn, steps, batch=False, compile_setup=True):
@@ -353,7 +354,9 @@ class CGaReflAPI(api_refl1d.CRefl1DAPI):
     def fnSaveMolgroups(self, problem):
         # should call the setup.cc function that saves mol.dat
         # TODO: Needs testing
-        problem.active_model.fitness.output_model()
+        # CRUFT: bumps 1.0 changed problem.active_model from FitProblem to Fitness
+        active_model = getattr(problem.active_model, 'fitness', problem.active_model)
+        active_model.output_model()
 
     def fnSimulateData(self, diAddition, liData, data_column='R'):
         # change dir of parname:parvalue into list of expressions to be inserted into setup.cc
