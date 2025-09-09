@@ -116,6 +116,9 @@ class CMolStat:
             from scattertools.support import api_sasview
             self.Interactor = api_sasview.CSASViewAPI(self.spath, self.mcmcpath, self.runfile, load_state=load_state)
 
+        # mirror problem attribute in the top-level object for convenience
+        self.problem = self.Interactor.problem
+
         self.save_stat_data = save_stat_data
 
     def fnAnalyzeStatFile(self, fConfidence=-1, sparse=0):

@@ -86,6 +86,15 @@ class CBumpsAPI(api_base.CBaseAPI):
         for file in glob.glob(origin + r'/*.pyc'):
             shutil.copy(file, target)
 
+    def fnLoadBest(self):
+        """
+        Loads best fit parameters from state into model
+        :return: no return value
+        """
+        if self.state is not None and self.problem is not None:
+            p = self.state.best()[0]
+            self.problem.setp(p)
+
     def fnLoadMCMCResults(self):
         # load Parameter
         if self.diParameters == {}:
@@ -291,10 +300,7 @@ class CBumpsAPI(api_base.CBaseAPI):
     def fnRestoreFit(self):
         self.problem = self.fnRestoreFitProblem()
         self.state = self.fnRestoreState()
-        if self.state is not None:
-            # repopulate state with best fit
-            p = self.state.best()[0]
-            self.problem.setp(p)
+        self.fnLoadBest()
 
     def fnRestoreFitProblem(self):
         if path.isfile(os.path.join(self.spath, self.runfile + ".py")):
