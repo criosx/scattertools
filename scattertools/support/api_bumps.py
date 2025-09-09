@@ -11,9 +11,11 @@ import numpy
 import matplotlib
 from matplotlib import pyplot as plt
 
+import bumps.dream.state
 from bumps.cli import save_best
 from bumps.mapper import MPMapper
 from bumps.fitters import FitDriver, DreamFit, MPFit
+from bumps.fitproblem import load_problem
 
 from . import api_base
 
@@ -38,6 +40,7 @@ def iter_chisq(problem):
         else:
             yield fitness_chisq(M)
 
+
 def iter_models(problem):
     """
     Iterate over fitness for each model.
@@ -46,7 +49,13 @@ def iter_models(problem):
     MultiFitProblem.models returning a sequence of FitProblem. New bumps
     has only FitProblem with FitProblem.models returning a sequence of Fitness.
     """
-    models_iter = getattr(problem, 'models', [problem.fitness])
+    _sentinel = object()
+    attr = getattr(problem, 'models', _sentinel)
+    if attr is _sentinel:
+        models_iter = [problem.fitness]  # may raise, but only if needed
+    else:
+        models_iter = attr
+
     for M in models_iter:
         if hasattr(M, 'chisq'):  # iterating over FitProblem
             # TODO: By calling .chisq() I currently force an update of the cost function. There must be a better way
@@ -59,9 +68,9 @@ def iter_models(problem):
 class CBumpsAPI(api_base.CBaseAPI):
     def __init__(self, spath=".", mcmcpath=".", runfile="", state=None, problem=None, load_state=True):
         super().__init__(spath, mcmcpath, runfile)
+        self.problem = self.fnRestoreFitProblem() if problem is None else problem
         if load_state:
             self.state = self.fnRestoreState() if state is None else state
-        self.problem = self.fnRestoreFitProblem() if problem is None else problem
 
     def fnBackup(self, origin=None, target=None):
         if origin is None:
@@ -288,8 +297,6 @@ class CBumpsAPI(api_base.CBaseAPI):
             self.problem.setp(p)
 
     def fnRestoreFitProblem(self):
-        from bumps.fitproblem import load_problem
-
         if path.isfile(os.path.join(self.spath, self.runfile + ".py")):
             problem = load_problem(os.path.join(self.spath, self.runfile + ".py"))
         else:
@@ -299,15 +306,22 @@ class CBumpsAPI(api_base.CBaseAPI):
         return problem
 
     def fnRestoreState(self):
-        import bumps.dream.state
         fulldir = os.path.join(self.spath, self.mcmcpath)
-        if path.isfile(os.path.join(fulldir, self.runfile) + '.py') and path.isfile(os.path.join(fulldir, self.runfile)
-                                                                                    + '-chain.mc.gz'):
-            state = bumps.dream.state.load_state(os.path.join(fulldir, self.runfile))
-            state.mark_outliers()  # ignore outlier chains
+        if path.isdir(fulldir) and self.problem is not None:
+            try:
+                state = bumps.dream.state.load_state(os.path.join(fulldir, self.runfile))
+                state.mark_outliers()  # ignore outlier chains
+            except FileNotFoundError:
+                print("No state in {}".format(fulldir))
+                print("No state reloaded.")
+                state = None
+        elif self.problem is None:
+            print("No problem loaded.")
+            print("No state reloaded.")
+            state = None
         else:
-            print("No file: " + os.path.join(fulldir, self.runfile) + '.py')
-            print("No state to reload.")
+            print("No directory {}".format(fulldir))
+            print("No state reloaded.")
             state = None
         return state
 
@@ -337,17 +351,18 @@ class CBumpsAPI(api_base.CBaseAPI):
         """
 
         # Calling bumps functions directl
-        model_file = os.path.join(self.spath, self.runfile) + '.py'
+        model_file = os.path.join(self.spath, self.runfile + '.py')
         mcmcpath = os.path.join(self.spath, self.mcmcpath)
 
         if not os.path.isdir(mcmcpath):
             os.mkdir(mcmcpath)
 
-        # save model file in output directory
-        shutil.copy(model_file, mcmcpath)
+        # save model file in output directory, if such is used
+        if os.path.isfile(model_file):
+            shutil.copy(model_file, mcmcpath)
 
-        if reload_problem or self.problem is None:
-            self.problem = self.fnRestoreFitProblem()
+            if reload_problem or self.problem is None:
+                self.problem = self.fnRestoreFitProblem()
 
         mapper = MPMapper.start_mapper(self.problem, None, cpus=0)
         monitors = None if not batch else []
