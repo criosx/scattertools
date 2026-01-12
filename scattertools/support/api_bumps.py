@@ -314,10 +314,11 @@ class CBumpsAPI(api_base.CBaseAPI):
     def fnRestoreState(self):
         fulldir = os.path.join(self.spath, self.mcmcpath)
         if path.isdir(fulldir) and self.problem is not None:
-            try:
-                state = bumps.dream.state.load_state(os.path.join(fulldir, self.runfile))
+            filename = os.path.join(fulldir, self.runfile)
+            if os.path.isfile(filename):
+                state = bumps.dream.state.load_state(filename)
                 state.mark_outliers()  # ignore outlier chains
-            except FileNotFoundError:
+            else:
                 print("No state in {}".format(fulldir))
                 print("No state reloaded.")
                 state = None
