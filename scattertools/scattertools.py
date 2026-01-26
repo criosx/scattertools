@@ -475,10 +475,6 @@ def fnBin2D(filename,list1,list2,start1,stop1,step1,start2,stop2,step2,Polar=Fal
             elif Polar==False or bNegativeBeta==False:
                 avgarr1[n1][n2]=((avgarr1[n1][n2]*(arr1[n1][n2]-1))+AvgVariable[i])/arr1[n1][n2]
 
-
-
-
-
     fnSave2DArray(filename+"_betaneg_binned.dat",arr2)                                   #write out to file
     fnSave2DArray(filename+"_betapos_binned.dat",arr1)                                   #write out to file
 

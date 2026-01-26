@@ -3,7 +3,10 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/scattertools" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/build" />
+      <excludeFolder url="file://$MODULE_DIR$/debug" />
       <excludeFolder url="file://$MODULE_DIR$/dist" />
+      <excludeFolder url="file://$MODULE_DIR$/scattertools.egg-info" />
     </content>
     <orderEntry type="jdk" jdkName="$USER_HOME$/miniforge3/envs/refl1d" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

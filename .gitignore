@@ -31,3 +31,4 @@ venv.bak/
 .idea
 *.swp
 *.bak
+/debug/
