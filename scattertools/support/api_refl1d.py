@@ -286,8 +286,10 @@ class CRefl1DAPI(api_bumps.CBumpsAPI):
     def fnSimulateData(self, diNewPars, liData, data_column='R'):
         self.fnUpdateModelPars(diNewPars)
 
-        for i, M in enumerate(api_bumps.iter_models(self.problem)):
-            qvec, scatt = self.problem.reflectivity()
+        for i, M in enumerate(self.problem.models):
+            result = M.reflectivity()
+            qvec = result[0]
+            scatt = result[1]
             liData[i][1][data_column] = scatt
             liData[i][1]['Q'] = qvec
 

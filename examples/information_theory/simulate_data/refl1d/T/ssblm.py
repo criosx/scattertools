@@ -6,7 +6,7 @@ from molgroups import mol
 from molgroups import lipids
 from molgroups import components as cmp
 from refl1d.names import load4, Parameter, SLD, Slab, Stack, Experiment, FitProblem
-from refl1d.flayer import FunctionalProfile
+from refl1d.sample.flayer import FunctionalProfile
 
 ## === Film structure definition section ===
 
@@ -14,7 +14,7 @@ from refl1d.flayer import FunctionalProfile
 
 def bilayer(z, sigma, bulknsld, global_rough, rho_substrate, l_submembrane, l_lipid1, l_lipid2, vf_bilayer):
     """ Fairly generic bilayer. This assumes a stack of materials already existing because siox.l is set to zero """
-    
+
     # Set unused parameters
     l_siox = 0.0 # could make a parameter in the future
     rho_siox = 0.0
@@ -25,7 +25,7 @@ def bilayer(z, sigma, bulknsld, global_rough, rho_substrate, l_submembrane, l_li
 
     blm.fnSet(sigma=sigma, bulknsld=bulknsld, global_rough=global_rough, rho_substrate=rho_substrate, rho_siox=rho_siox, l_siox=l_siox,
               l_submembrane=l_submembrane, l_lipid1=l_lipid1, l_lipid2=l_lipid2, vf_bilayer=vf_bilayer)
-    
+
     # Calculate scattering properties of volume occupied by bilayer
     normarea, area, nsl = blm.fnWriteProfile(z)
 
@@ -67,7 +67,7 @@ silicon = SLD(name='silicon', rho=2.0690, irho=0.0000)
 
 layer_d2o = Slab(material=d2o, thickness=0.0000, interface=5.0000)
 layer_h2o = Slab(material=h2o, thickness=0.0000, interface=5.0000)
-layer_tiox = Slab(material=tiox, thickness=l_tiox - (blm.substrate.z + 0.5 * blm.substrate.l), interface=0.0)
+layer_tiox = Slab(material=tiox, thickness=l_tiox - (blm.substrate.z + 0.5 * blm.substrate.length), interface=0.0)
 layer_siox = Slab(material=siox, thickness=7.5804, interface=10.000)
 layer_silicon = Slab(material=silicon, thickness=0.0000, interface=0.0000)
 
@@ -147,4 +147,3 @@ problem.name = "DOPC bilayer on TiOx substrate"
 problem.bilayers = [blm]
 problem.dimension = dimension
 problem.stepsize = stepsize
-
