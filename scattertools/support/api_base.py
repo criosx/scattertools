@@ -23,36 +23,52 @@ class CBaseAPI:
     @staticmethod
     def fnExtendQRange(liData, qmin=None, qmax=None, conserve_dq_q=False):
         for i in range(len(liData)):
+            df = liData[i][1]
+
             if qmax is not None:
                 # first cut data at qrange
-                liData[i][1] = liData[i][1][(liData[i][1].Q <= qmax)]
+                df = df.loc[df['Q'] <= qmax].copy()
+
                 # now add data points in case the q-range is too short
-                while liData[i][1]['Q'].iloc[-1] < qmax:
-                    newframe = pandas.DataFrame(liData[i][1][-1:], columns=liData[i][1].columns, copy=True)
-                    newframe['Q'].iloc[-1] = 1.1 * liData[i][1]['Q'].iloc[-1]
+                while df['Q'].iloc[-1] < qmax:
+                    newframe = df.iloc[[-1]].copy()
+                    new_q = 1.1 * df['Q'].iloc[-1]
+                    newframe.loc[newframe.index[-1], 'Q'] = new_q
+
                     if conserve_dq_q:
-                        newframe['dQ'].iloc[-1] = liData[i][1]['dQ'].iloc[-1] / liData[i][1]['Q'].iloc[-1] * \
-                                                  newframe['Q'].iloc[-1]
-                    if newframe['Q'].iloc[-1] < qmax:
-                        liData[i][1] = pandas.concat([liData[i][1], newframe], axis=0, ignore_index=True)
+                        old_q = df['Q'].iloc[-1]
+                        old_dq = df['dQ'].iloc[-1]
+                        newframe.loc[newframe.index[-1], 'dQ'] = old_dq / old_q * new_q
+
+                    if new_q < qmax:
+                        df = pandas.concat([df, newframe], axis=0, ignore_index=True)
                     else:
                         break
+
             if qmin is not None:
-                liData[i][1] = liData[i][1][(liData[i][1].Q >= qmin)]
-                while liData[i][1]['Q'].iloc[0] > qmin:
-                    newframe = pandas.DataFrame(liData[i][1][:1], columns=liData[i][1].columns, copy=True)
-                    if liData[i][1]['Q'].iloc[0] > 0.001:
-                        step = 0.1 * liData[i][1]['Q'].iloc[0]
+                df = df.loc[df['Q'] >= qmin].copy()
+
+                while df['Q'].iloc[0] > qmin:
+                    newframe = df.iloc[[0]].copy()
+                    if df['Q'].iloc[0] > 0.001:
+                        step = 0.1 * df['Q'].iloc[0]
                     else:
                         step = 0.0001
-                    newframe['Q'].iloc[0] = liData[i][1]['Q'].iloc[0] - step
+
+                    new_q = df['Q'].iloc[0] - step
+                    newframe.loc[newframe.index[0], 'Q'] = new_q
+
                     if conserve_dq_q:
-                        newframe['dQ'].iloc[0] = liData[i][1]['dQ'].iloc[0] / liData[i][1]['Q'].iloc[0] * \
-                                                 newframe['Q'].iloc[0]
-                    if newframe['Q'].iloc[0] > qmin:
-                        liData[i][1] = pandas.concat([newframe, liData[i][1]], axis=0, ignore_index=True)
+                        old_q = df['Q'].iloc[0]
+                        old_dq = df['dQ'].iloc[0]
+                        newframe.loc[newframe.index[0], 'dQ'] = old_dq / old_q * new_q
+
+                    if new_q > qmin:
+                        df = pandas.concat([newframe, df], axis=0, ignore_index=True)
                     else:
                         break
+
+            liData[i][1] = df
         return liData
 
 
