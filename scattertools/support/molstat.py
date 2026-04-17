@@ -570,6 +570,16 @@ class CMolStat:
             retval.append(self.diStatResults['Parameters'][par]['Values'][iteration])
         return retval
 
+    def fnGetAllParameterNames(self, model: int=0):
+        """
+        Returns all model parameter names of the problem, not just those for which fit ranges are defined
+        :param model: the model number of the problem
+        :return: (list) model parameter names
+        """
+        if self.Interactor is None:
+            return []
+        return self.Interactor.fnGetAllParameterNames(model)
+
     def fnGetChiSq(self):  # export chi squared
         return self.chisq
 

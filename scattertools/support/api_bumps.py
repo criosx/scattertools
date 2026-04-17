@@ -86,6 +86,18 @@ class CBumpsAPI(api_base.CBaseAPI):
         for file in glob.glob(origin + r'/*.pyc'):
             shutil.copy(file, target)
 
+    def fnGetAllParameterNames(self, model: int = 0):
+        """
+        Returns all model parameter names of the problem, not just those for which fit ranges are defined
+        :param model: the model number of the problem
+        :return: (list) model parameter names
+        """
+        if self.problem is None:
+            return []
+
+        allpars = self.problem.model_parameters()['models'][model].keys()
+        return allpars
+
     def fnLoadBest(self):
         """
         Loads best fit parameters from state into model
