@@ -37,9 +37,15 @@ def prepare_fit_directory(fitdir=None, runfile=None, datafile_names=None):
 
 
 class CMolStat:
-    def __init__(self, fitsource="refl1d", spath=".", mcmcpath=".",
-                 runfile="run", state=None, problem=None,
-                 load_state=True, save_stat_data=False):
+    def __init__(self,
+                 fitsource="refl1d",
+                 spath=".",
+                 mcmcpath=".",
+                 runfile="run",
+                 state=None,
+                 problem=None,
+                 load_state=True,
+                 save_stat_data=False):
         """
         self.diParameters is a dictionary containing all parameters. Structure:
 

@@ -3,6 +3,7 @@ import itertools
 import numpy
 import numpy as np
 import os
+from pathlib import Path
 import pickle
 import pandas
 import sys
@@ -15,11 +16,12 @@ from math import fabs, pow, floor, ceil
 from subprocess import Popen
 from time import sleep
 from IPython.display import clear_output
-from gpcam.autonomous_experimenter import AutonomousExperimenterGP
 
 from scattertools.support import molstat
 from scattertools.infotheory import MVN
 from scattertools.infotheory import GMM
+
+from pse.gp import Gp
 
 
 # static methods
@@ -209,60 +211,212 @@ def save_plot_2d(x, y, z, xlabel, ylabel, color, filename='plot', zmin=None, zma
 # requires a compiled and ready to go fit whose fit parameters are modified and fixed
 # avoid_symmetric prevents calculating symmetry-related results by enforcing the indices of varied parameters
 # are an ordered list
-class Entropy:
+class Entropy(Gp):
+    def __init__(self,
+                 exp_par,
+                 fitsource,
+                 spath,
+                 mcmcpath,
+                 runfile,
+                 mcmcburn=16000,
+                 mcmcsteps=5000,
+                 deldir=True,
+                 convergence=2.0,
+                 fitter='MCMC',
+                 remove_fit_dir=True,
+                 lm_iterations=3,
+                 mode='water',
+                 background_rule=None,
+                 configuration=None,
+                 qmin=None,
+                 qmax=None,
+                 qrangefromfile=False,
+                 t_total=None,
+                 calc_symmetric=True,
+                 upper_info_plotlevel=None,
+                 plotlimits_filename='',
+                 jupyter_clear_output=False,
+                 pse_path = None,
+                 acq_func="variance",
+                 gpcam_iterations=50,
+                 gpcam_init_dataset_size=20,
+                 gpcam_step=1,
+                 keep_plots=False,
+                 miniter=1,
+                 optimizer='grid',
+                 parallel_measurements=1,
+                 resume=True,
+                 signal_estimate=10,
+                 show_support_points=False,
+                 train_global_every=None,
+                 gp_discrete_points=None,
+                 project_name=''):
 
-    def __init__(self, fitsource, spath, mcmcpath, runfile, mcmcburn=16000, mcmcsteps=5000, deldir=True,
-                 convergence=2.0, miniter=1, mode='water', background_rule=None, bFetchMode=False, bClusterMode=False,
-                 calc_symmetric=True, upper_info_plotlevel=None, plotlimits_filename='', slurmscript='',
-                 configuration=None, optimizer='grid', keep_plots=False, show_support_points=False, qmin=None,
-                 qmax=None, qrangefromfile=False, t_total=None, jupyter_clear_output=False, gpcam_iterations=50,
-                 gpcam_init_dataset_size=20, gpcam_step=None, acq_func="variance", fitter='MCMC', remove_fit_dir=True,
-                 lm_iterations=3):
+        """
+        The object for an experimental optimization of a SANS or reflectometry experiment, derived from a PSE
+        optimization parent object.
 
+        Several Comments:
+        * Entropypar.dat contains a list of all fit parameters with a designation, whether they are marginal (d) or
+        nuisance (i) parameters. This is followed by the parameter name, the initial parameter value, and the fit
+        boundaries.
+        * Configuration parameters are given by a preceeding nxy, where x is the data set it applies to and y the
+        configuration number. Not giving any xy makes this parameter apply to all configurations, as does passing
+        a '*' in place of either x or y.
+        * Any number xy following a fit parameter indicates that this paramter is used for this particular
+        dataset/configuration to determine the background (incoherent cross-section). This typically applies to SLDs.
+        The 'mode' argument for entropy.Entropy() then determines whether this is to be interpreted as an aqueous
+        solvent or other.
+        * If three more numbers are given, this designates that an information content search over this parameter is
+        performed (start, stop, step).
+        * A preceding f (fi or fd) at the beginning of the line indicates that the fit boundaries for such a search
+        parameter are fixed (for example for volume fractions between 0 and 1). Otherwise, the fit boundary moves
+        according to the varied parameter and the initally given fit boundaries.
+        * Any theta offset currently needs to have an initial value of zero. Otherwise, refl1d will shift the q-values
+        during data simulation with unexpected outcomes.
+        * If an instrumental parameter is specified for one data set, the instrumental parameter needs to be specified
+        for all other datasets, as well.
+
+        Here is an example file content:
+        text = ['d _ _ radius_equatorial 11 5 17',
+                'd _ _ radius_polar  20 17 35',
+                'i _ _ volfraction  0.01 0.0001 0.02',
+                'n * * lambda 6.21',
+                'n * * differential_cross_section_buffer 0.059',
+                'n * 0 sample_detector_distance 100',
+                'n * 1 sample_detector_distance 400',
+                'n * 2 sample_detector_distance 1300',
+                'n * 0 source_sample_distance 387.6',
+                'n * 1 source_sample_distance 850.05',
+                'n * 2 source_sample_distance 1467',
+                'n * 0 neutron_flux 9e5',
+                'n * 1 neutron_flux 2e5',
+                'n * 2 neutron_flux 1e5',
+                'n * * source_aperture_radius 2.54',
+                'n * * sample_aperture_radius 0.635',
+                'n * * dlambda_lambda 0.136',
+                'n * * beamstop_diameter 10.16',
+                'n * 0 time 1600',
+                'n * 1 time 3600',
+                'n * 2 time 4400',
+                'n * 0 beam_center_x 26.416',
+                'n * * cuvette_thickness 0.2 0 0 0.02 4.1 0.1'
+        ]
+        If provided directly as a Pandas dataframe, here are the header names:
+        header_names = ['type', 'dataset', 'configuration', 'par', 'value', 'l_fit', 'u_fit', 'l_sim', 'u_sim',
+                        'step_sim']
+
+        * Data filenames are currently limited to sim.dat for a single file fit, or simx.dat, x = 0 ... n, for fits
+        with multiple data sets
+
+        :param exp_par: (Pandas dataframe | (str | os.PathLike, Path) Contents of an entropy.par file (see above) given
+                        either as a Pandas dataframe directly, or as a string / path object pointing to a file from
+                        which the information will be read.
+
+        :param fitsource:               CMolStat fitsource
+        :param spath:                   CMolStat spath
+        :param mcmcpath:                CMolStat mcmcpath
+        :param runfile:                 CMolStat runfile
+
+        :param mcmcburn:
+        :param mcmcsteps:
+        :param deldir:
+        :param convergence:
+        :param fitter:
+        :param remove_fit_dir:
+        :param lm_iterations:
+        :param mode:
+        :param background_rule:
+        :param configuration:
+        :param qmin:
+        :param qmax:
+        :param qrangefromfile:
+        :param t_total:
+        :param calc_symmetric:
+        :param upper_info_plotlevel:
+        :param plotlimits_filename:
+        :param jupyter_clear_output:
+
+        :param pse_path:                PSE Gp storage_path
+        :param acq_func:                PSE Gp acq_func
+        :param gpcam_iterations:        PSE Gp gpcam_iterations
+        :param gpcam_init_dataset_size: PSE Gp gpcam_init_dataset_size
+        :param gpcam_step:              PSE Gp gpcam_step
+        :param keep_plots:              PSE Gp keep_plots
+        :param miniter:                 PSE Gp miniter
+        :param optimizer:               PSE Gp optimizer
+        :param parallel_measurements:   PSE Gp parallel_measurements
+        :param resume:                  PSE Gp resume
+        :param signal_estimate:         PSE Gp signal_estimate
+        :param show_support_points:     PSE Gp show_support_points
+        :param train_global_every:      PSE Gp train_global_every
+        :param gp_discrete_points:      PSE Gp gp_discrete_points
+        :param project_name:            PSE Gp project_name
+        """
+
+        # initialize molstat
         self.fitsource = fitsource
-        self.spath = spath
+        self.spath = Path(spath).expanduser().resolve()
         self.mcmcpath = mcmcpath
         self.runfile = runfile
+        self.molstat = molstat.CMolStat(fitsource=fitsource, spath=spath, mcmcpath=mcmcpath, runfile=runfile)
+
+        # arguments for running the fit
         self.mcmcburn = mcmcburn
         self.mcmcsteps = mcmcsteps
         self.deldir = deldir
         self.convergence = convergence
-        self.miniter = miniter
-        self.mode = mode
-        self.background_rule = background_rule
-        self.bFetchMode = bFetchMode
-        self.bClusterMode = bClusterMode
-        self.calc_symmetric = calc_symmetric
-        self.upper_info_plotlevel = upper_info_plotlevel
-        self.plotlimits_filename = plotlimits_filename
-        self.slurmscript = slurmscript
-        self.configuration = configuration
-        self.optimizer = optimizer
-        self.gpiteration = 0
+        self.fitter = fitter
+        self.lm_iterations = lm_iterations
+        self.remove_fit_dir = remove_fit_dir
+
+        # PSE object arguments
+        self.pse_path = pse_path
+        self.acq_func = acq_func
+        self.gpcam_iterations = gpcam_iterations
+        self.gpcam_init_dataset_size = gpcam_init_dataset_size
+        self.gpcam_step = gpcam_step
         self.keep_plots = keep_plots
+        self.miniter = miniter
+        self.optimizer = optimizer
+        self.parallel_measurements = parallel_measurements
+        self.resume = resume
+        self.signal_estimate = signal_estimate
         self.show_support_points = show_support_points
+        self.train_global_every = train_global_every
+        self.gp_discrete_points = gp_discrete_points
+        self.project_name = project_name
+
+        # Data simulation parameters
+        self.background_rule = background_rule
+        self.configuration = configuration
         self.qmin = qmin
         self.qmax = qmax
         self.qrangefromfile = qrangefromfile
         self.t_total = t_total
+
+        # plotting parameters
+        self.upper_info_plotlevel = upper_info_plotlevel
+        self.plotlimits_filename = plotlimits_filename
         self.jupyter_clear_output = jupyter_clear_output
-        self.gpcam_iterations = gpcam_iterations
-        self.gpcam_init_dataset_size = gpcam_init_dataset_size
-        self.gpcam_step = gpcam_step
-        self.acq_func = acq_func
-        self.fitter = fitter
-        self.remove_fit_dir = remove_fit_dir
-        self.lm_iterations = lm_iterations
 
-        self.my_ae = None
+        # general optimization parameters
+        self.mode = mode
+        self.calc_symmetric = calc_symmetric
 
-        self.molstat = molstat.CMolStat(fitsource=fitsource, spath=spath, mcmcpath=mcmcpath, runfile=runfile)
-
-        # Parse parameters from entropypar.dat
-        header_names = ['type', 'dataset', 'configuration', 'par', 'value', 'l_fit', 'u_fit', 'l_sim', 'u_sim',
-                        'step_sim']
-        self.allpar = pandas.read_csv('entropypar.dat', sep='\s+', header=None, names=header_names,
-                                      skip_blank_lines=True, comment='#')
+        # Use provided experimental optimization pars or load from file entropypar.dat
+        if isinstance(exp_par, pandas.DataFrame):
+            self.allpar = exp_par
+            # TODO: Checks on provided data
+        else:
+            if exp_par is None:
+                filepath = 'entropypar.dat'
+            else:
+                filepath = Path(exp_par).expanduser().resolve()
+            header_names = ['type', 'dataset', 'configuration', 'par', 'value', 'l_fit', 'u_fit', 'l_sim', 'u_sim',
+                            'step_sim']
+            self.allpar = pandas.read_csv(filepath, sep='\s+', header=None, names=header_names,  skip_blank_lines=True,
+                                          comment='#')
 
         # define unique names, since instrument parameters might have the same name for different datasets and
         # configurations
@@ -285,16 +439,9 @@ class Entropy:
         # order. This might have to be looked at in the future.
         # keys: i: independent (nuisance parameter), d: dependent (parameter of interest), n or otherwise none
         # want to calculate H(d|i,y)
-
         self.dependent_parameters = []
         self.independent_parameters = []
         self.parlist = []
-        self.joblist = []
-        self.jobmax = 10
-
-        # fetch mode and cluster mode are exclusive
-        if self.bFetchMode and self.bClusterMode:
-            self.bClusterMode = False
 
         i = 0
         for row in self.allpar.itertuples():
@@ -309,6 +456,17 @@ class Entropy:
 
         # only those parameters that will be varied
         self.steppar = self.allpar.dropna(axis=0)
+
+        # now, bring steppar in line with PSE Gp's requirements for the search space
+        self.pse_par = self.steppar.loc[:, ['unique_name', 'value', 'l_sim', 'u_sim', 'step_sim']].rename(
+            columns={
+                'unique_name': 'name',
+                'l_sim': 'lower_opt',
+                'u_sim': 'upper_opt',
+                'step_sim': 'step_opt'
+            }
+        )
+        self.pse_par['type'] = 'parameter'
 
         # create data frame for simpar.dat needed by the data simulation routines
         # non-parameters such as qrange and prefactor will be included in simpar, but eventually ignored
@@ -327,6 +485,11 @@ class Entropy:
 
         self.priorentropy, self.priorentropy_marginal = self.calc_prior()
 
+        if self.pse_path is None:
+            self.pse_path = self.spath / 'results'
+        else:
+            self.pse_path = Path(self.pse_path).expanduser().resolve()
+
         if optimizer == 'grid':
             self.results_mvn = np.full(self.steplist, self.priorentropy)
             self.results_gmm = np.full(self.steplist, self.priorentropy)
@@ -340,20 +503,33 @@ class Entropy:
             self.sqstd_gmm = np.zeros(self.results_gmm.shape)
             self.sqstd_mvn_marginal = np.zeros(self.results_mvn_marginal.shape)
             self.sqstd_gmm_marginal = np.zeros(self.results_gmm_marginal.shape)
-            self.prediction_gpcam = np.zeros(self.results_gmm_marginal.shape)
             self.par_median = np.zeros((len(self.parlist),) + self.results_mvn.shape)
             self.par_std = np.zeros((len(self.parlist),) + self.results_mvn.shape)
 
-            if path.isfile(path.join(spath, 'results', 'MVN_entropy.npy')):
+            if (self.pse_path / 'MVN_entropy.npy').is_file():
                 self.load_results(spath)
 
         elif optimizer == 'gpcam' or optimizer == 'gpCAM':
-            if path.isfile(path.join(spath, 'results', 'gpCAMstream.pkl')):
-                with open(path.join(spath, 'results', 'gpCAMstream.pkl'), 'rb') as file:
-                    self.gpCAMstream = pickle.load(file)
-                    self.gpiteration = len(self.gpCAMstream['position'])
-            else:
-                self.gpCAMstream = {'position': [], 'value': [], 'variance': []}
+            pass
+
+        # call PSE Gp superclass
+        super().__init__(exp_par=self.pse_par,
+                         storage_path=self.pse_path,
+                         acq_func=self.acq_func,
+                         gpcam_iterations=self.gpcam_iterations,
+                         gpcam_init_dataset_size=self.gpcam_init_dataset_size,
+                         gpcam_step=self.gpcam_step,
+                         keep_plots=self.keep_plots,
+                         miniter=self.miniter,
+                         optimizer=self.optimizer,
+                         parallel_measurements=self.parallel_measurements,
+                         resume=self.resume,
+                         signal_estimate=self.signal_estimate,
+                         show_support_points=self.show_support_points,
+                         train_global_every=self.train_global_every,
+                         gp_discrete_points=self.gp_discrete_points,
+                         project_name=self.project_name
+                         )
 
     def calc_entropy(self, molstat=None, cov=False):
 
@@ -470,85 +646,26 @@ class Entropy:
                     priorentropy_marginal += np.log(row.u_fit - row.l_fit) / np.log(2)
         return priorentropy, priorentropy_marginal
 
-    def gpcam_instrument(self, data, Test=False):
-        print("This is the current length of the data received by gpCAM: ", len(data))
-        print("Suggested by gpCAM: ", data)
-        for entry in data:
-            if Test:
-                # value = np.sin(np.linalg.norm(entry["position"]))
-                # value = np.array(entry['position']).sum() / 1000
-                value = (entry['position'][0] - entry['position'][1]) ** 2
-                time0 = entry['position'][2]
-                time1 = entry['position'][3]
-                time2 = entry['position'][4]
-                tf = 14400 / (time0 + time1 + time2)
-                value += np.log10(time0 * tf) * 0.5
-                value += np.log10(time1 * tf) * 1.5
-                value += np.log10(time2 * tf) * 1
-                entry['value'] = value
-                print('Value: ', entry['value'])
-                variance = None  # 0.01 * np.abs(entry['value'])
-                entry['variance'] = variance
-            else:
-                if self.fitter == 'LM':
-                    me = []
-                    for _ in range(self.lm_iterations):
-                        marginal_entropy = self.work_on_iteration(position=entry['position'],
-                                                                  gpiteration=self.gpiteration)
-                        me.append(self.priorentropy_marginal - marginal_entropy)
-                    value = numpy.mean(me)
-                    variance = numpy.var(me)
-                else:
-                    marginal_entropy = self.work_on_iteration(position=entry['position'],
-                                                              gpiteration=self.gpiteration)
-                    value = self.priorentropy_marginal - marginal_entropy
-                    variance = None
-                entry["value"] = value
-                entry['variance'] = variance
-                # entry["cost"]  = [np.array([0,0]),entry["position"],np.sum(entry["position"])]
+    def do_measurement(self, opt_pars, it_label, entry, q):
 
-            self.gpCAMstream['position'].append(entry['position'])
-            self.gpCAMstream['value'].append(value)
-            self.gpCAMstream['variance'].append(variance)
-            self.save_results_gpcam(self.spath)
-            self.gpiteration += 1
-        return data
-
-    def gpcam_prediction(self, my_ae):
-        # create a flattened array of all positions to be evaluated, maximize the use of numpy
-        prediction_positions = np.array(self.axes[0])
-        for i in range(1, len(self.axes)):
-            a = np.array([prediction_positions] * len(self.axes[i]))
-            # transpose the first two axes of a only
-            newshape = np.linspace(0, len(a.shape) - 1, len(a.shape), dtype=int)
-            newshape[0] = 1
-            newshape[1] = 0
-            a = np.transpose(a, newshape)
-            b = np.array([self.axes[i]] * prediction_positions.shape[0])
-            prediction_positions = np.dstack((a, b))
-            # now flatten the first two dimensions
-            newshape = list(prediction_positions.shape[1:])
-            newshape[0] = newshape[0] * prediction_positions.shape[0]
-            newshape = tuple(newshape)
-            prediction_positions = np.reshape(prediction_positions, newshape)
-
-        res = my_ae.gp_optimizer.posterior_mean(prediction_positions)
-        f = res["f(x)"]
-        self.prediction_gpcam = f.reshape(self.steplist)
-
-        path1 = path.join(self.spath, 'plots')
-        if not path.isdir(path1):
-            mkdir(path1)
-        # self.plot_arr(self.prediction_gpcam, filename=path.join(path1, 'prediction_gpcam'), mark_maximum=True)
-
-        if self.show_support_points:
-            support_points = np.array(self.gpCAMstream['position'])
+        if self.fitter == 'LM':
+            me = []
+            for _ in range(self.lm_iterations):
+                marginal_entropy = self.prepare_fit(position=entry['position'], gpiteration=it_label)
+                me.append(self.priorentropy_marginal - marginal_entropy)
+            value = numpy.mean(me)
+            variance = numpy.var(me)
         else:
-            support_points = None
+            marginal_entropy = self.prepare_fit(position=entry['position'], gpiteration=it_label)
+            value = self.priorentropy_marginal - marginal_entropy
+            variance = None
 
-        self.plot_arr(self.prediction_gpcam,
-                      filename=path.join(path1, 'prediction_gpcam'), mark_maximum=True,
-                      support_points=support_points)
+        # THESE THREE LINES NEED DO BE PRESENT IN EVERY DERIVED METHOD
+        entry['value'] = value
+        entry['variance'] = variance
+        q.put(entry)
+
+        return value, variance
 
     def gridsearch_iterate_over_all_indices(self, refinement=False):
         bWorkedOnIndex = False
@@ -654,10 +771,7 @@ class Entropy:
         self.par_std = np.load(path.join(path1, 'par_std.npy'))
 
     def run_fit(self, molstat_instance, iteration, dirname, fulldirname):
-        # wait for a job to finish before submitting next cluster job
-        if self.bClusterMode:
-            self.waitforjob()
-
+        '''
         # run MCMC either cluster or local
         if self.bClusterMode:
             # write runscript
@@ -673,14 +787,14 @@ class Entropy:
             lCommand = ['sbatch', path.join(fulldirname, 'runscript')]
             Popen(lCommand)
             self.joblist.append(iteration)
+        '''
 
+        if self.fitter == 'MCMC':
+            molstat_instance.Interactor.fnRunMCMC(burn=self.mcmcburn, steps=self.mcmcsteps, batch=True)
         else:
-            if self.fitter == 'MCMC':
-                molstat_instance.Interactor.fnRunMCMC(burn=self.mcmcburn, steps=self.mcmcsteps, batch=True)
-            else:
-                # The best-fit is still loaded in problem from during data simulation. Therefore, we do not
-                # reload but use this starting point for a LM, hopefully gaining a speed-up.
-                molstat_instance.Interactor.fnRunMCMC(fitter='LM', batch=True, reload_problem=False)
+            # The best-fit is still loaded in problem from during data simulation. Therefore, we do not
+            # reload but use this starting point for a LM, hopefully gaining a speed-up.
+            molstat_instance.Interactor.fnRunMCMC(fitter='LM', batch=True, reload_problem=False)
         return
 
     def plot_results(self, mark_maximum=False):
@@ -783,130 +897,6 @@ class Entropy:
                                  filename=path.join(path1, filename+'_'+sp1+'_'+sp2), zmin=valmin, zmax=valmax,
                                  levels=levels, mark_maximum=mark_maximum, keep_plots=self.keep_plots)
 
-    def run_optimization(self):
-        if self.optimizer == 'grid':
-            self.run_optimization_grid()
-        elif self.optimizer == 'gpCAM' or self.optimizer == 'gpcam':
-            self.run_optimization_gpcam()
-
-    def run_optimization_gpcam(self):
-        # Using the gpCAM global optimizer, follows the example from the gpCAM website
-
-        # initialization
-        # feel free to try different acquisition functions, e.g. optional_acq_func, "covariance", "shannon_ig"
-        # note how costs are defined in for the autonomous experimenter
-        parlimits = []
-        for row in self.steppar.iterrows():
-            parlimits.append([row[1].l_sim, row[1].u_sim])
-        parlimits = np.array(parlimits)
-        numpars = len(parlimits)
-
-        x = self.gpCAMstream['position']
-        y = self.gpCAMstream['value']
-        v = self.gpCAMstream['variance']
-
-        if len(x) >= 1:
-            # use any previously computed results
-            x = np.array(x)
-            y = np.array(y)
-            v = np.array(v)
-            self.gpiteration = len(x)
-            bFirstEval = False
-        else:
-            x = None
-            y = None
-            v = None
-            self.gpiteration = 0
-            bFirstEval = True
-
-        hyperpars = np.ones([numpars + 1])
-        # the zeroth hyper bound is associated with a signal variance
-        # the others with the length scales of the parameter inputs
-        hyper_bounds = np.array([[0.001, 100]] * (numpars + 1))
-        for i in range(len(parlimits)):
-            delta = parlimits[i][1] - parlimits[i][0]
-            hyper_bounds[i + 1] = [delta * 1e-3, delta * 1e1]
-
-        self.my_ae = AutonomousExperimenterGP(parlimits, hyperpars, hyper_bounds,
-                                              init_dataset_size=self.gpcam_init_dataset_size,
-                                              instrument_func=self.gpcam_instrument,
-                                              acq_func=self.acq_func,  # optional_acq_func,
-                                              # cost_func = optional_cost_function,
-                                              # cost_update_func = optional_cost_update_function,
-                                              x=x, y=y, v=v,
-                                              # cost_func_params={"offset": 5.0, "slope": 10.0},
-                                              kernel_func=None, use_inv=True,
-                                              communicate_full_dataset=False, ram_economy=True)
-
-        # save and evaluate initial data set if it has been freshly calculate
-        if bFirstEval:
-            self.save_results_gpcam(self.spath)
-            self.gpcam_prediction(self.my_ae)
-
-        while len(self.my_ae.x) < self.gpcam_iterations:
-            print("length of the dataset: ", len(self.my_ae.x))
-            self.my_ae.train(method="global", max_iter=10000)  # or not, or both, choose "global","local" and "hgdl"
-            # update hyperparameters in case they are optimized asynchronously
-            self.my_ae.train(method="local")  # or not, or both, choose between "global","local" and "hgdl"
-            # training and client can be killed if desired and in case they are optimized asynchronously
-            # self.my_ae.kill_training()
-            if self.gpcam_step is not None:
-                target_iterations = len(self.my_ae.x) + self.gpcam_step
-                retrain_async_at = []
-            else:
-                target_iterations = self.gpcam_iterations
-                retrain_async_at = np.logspace(start=np.log10(len(self.my_ae.x)),
-                                               stop=np.log10(self.gpcam_iterations / 2), num=3, dtype=int)
-            # run the autonomous loop
-            self.my_ae.go(N=target_iterations,
-                          retrain_async_at=retrain_async_at,
-                          retrain_globally_at=[],
-                          retrain_locally_at=[],
-                          acq_func_opt_setting=lambda number: "global" if number % 2 == 0 else "local",
-                          training_opt_max_iter=20,
-                          training_opt_pop_size=10,
-                          training_opt_tol=1e-6,
-                          acq_func_opt_max_iter=20,
-                          acq_func_opt_pop_size=20,
-                          acq_func_opt_tol=1e-6,
-                          number_of_suggested_measurements=1,
-                          acq_func_opt_tol_adjust=0.1)
-
-            # training and client can be killed if desired and in case they are optimized asynchronously
-            if self.gpcam_step is None:
-                self.my_ae.kill_training()
-            self.save_results_gpcam(self.spath)
-            self.gpcam_prediction(self.my_ae)
-
-    def run_optimization_grid(self):
-        # Grid search
-        # every index has at least one result before re-analyzing any data point (refinement)
-        bRefinement = False
-        while True:
-            bWorkedOnAnyIndex = self.gridsearch_iterate_over_all_indices(bRefinement)
-            if not bWorkedOnAnyIndex:
-                if not bRefinement:
-                    # all indices have the minimum number of iterations -> start refinement
-                    bRefinement = True
-                else:
-                    # done with refinement
-                    break
-
-            if self.bClusterMode or self.bFetchMode:
-                # never repeat iterations on cluster or when just calculating entropies
-                break
-
-        # wait for all jobs to finish
-        if self.bClusterMode:
-            while self.joblist:
-                self.waitforjob(bFinish=True)
-
-    def save_results_gpcam(self, dirname):
-        path1 = path.join(dirname, 'results')
-        if not path.isdir(path1):
-            mkdir(path1)
-        with open(path.join(self.spath, 'results', 'gpCAMstream.pkl'), 'wb') as file:
-            pickle.dump(self.gpCAMstream, file)
 
     def save_results(self, dirname):
         path1 = path.join(dirname, 'results')
@@ -994,7 +984,7 @@ class Entropy:
                 np.savetxt(path.join(path1, 'MVN_n_' + str(sl) + '.txt'), self.n_mvn[sl])
                 np.savetxt(path.join(path1, 'MVN_n_marginal_' + str(sl) + '.txt'), self.n_mvn_marginal[sl])
 
-    def set_sim_pars_for_iteration(self, it=None, position=None):
+    def set_sim_pars_for_iteration(self, position=None):
         def _str2int(st):
             if st == '*':
                 i = 0
@@ -1070,13 +1060,7 @@ class Entropy:
                 lfit = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'l_fit'].iloc[0]
                 ufit = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'u_fit'].iloc[0]
 
-                if it is not None:
-                    # grid mode, calculate value from evaluation grid and index
-                    simvalue = lsim + stepsim * it.multi_index[isim]
-                    # print(self.steppar['unique_name'], '  ', simvalue, '\n')
-                else:
-                    # gpcam mode, use position suggested by gpcam
-                    simvalue = position[isim]
+                simvalue = position[isim]
 
                 if row.type == 'd' or row.type == 'fd' or row.type == 'i' or row.type == 'fi':
                     if row.type == 'fd' or row.type == 'fi':
@@ -1125,115 +1109,75 @@ class Entropy:
         simparsave.to_csv(path.join(self.spath, 'simpar.dat'), sep=' ', header=None, index=False)
         return configurations
 
-    def waitforjob(self, bFinish=False):
-        # finish flag means that parent is waiting for all jobs to finish and not because of a too long
-        # job queue
-        if len(self.joblist) >= self.jobmax or bFinish:
-            repeat = True
-            while repeat:
-                for job in self.joblist:
-                    if path.isfile(path.join(self.spath, 'iteration_' + str(job), 'save', self.runfile + '-chain.mc')):
-                        # wait 2 minutes to allow all output files to be written
-                        sleep(180)
-                        # zip up finished job
-                        # shutil.make_archive('iteration_' + str(job), 'zip', 'iteration_' + str(job))
-                        # call(['rm', '-r', 'iteration_' + str(job)])
-                        self.joblist.remove(job)
-                        repeat = False
-                        break
-                sleep(60)
-        return
 
-    def work_on_iteration(self, it=None, position=None, gpiteration=None):
+    def prepare_fit(self, position, itlabel: str):
 
-        if it is not None:
-            # grid mode, calculate which iteration we are on from itindex
-            # Recover itindex from 'it'. This is not an argument to the function anymore, as work_on_index might
-            # be used independently of iterate_over_all_indices
-            itindex = it.multi_index
-            if self.calc_symmetric:
-                iteration = it.iterindex
-            else:
-                # TODO: This is potentially expensive. Find better method for symmetry-conscious calculation
-                it2 = np.nditer(self.results_gmm, flags=['multi_index'])
-                iteration = 0
-                while not it2.finished:
-                    itindex2 = it2.multi_index
-                    if all(itindex2[i] <= itindex2[i + 1] for i in range(len(itindex2) - 1)):
-                        # iterations are only increased if this index is not dropped because of symmetry
-                        iteration += 1
-                    it2.iternext()
-        else:
-            # gpcam mode
-            iteration = gpiteration
-            itindex = None
+        itindex = None
 
-        dirname = 'iteration_' + str(iteration)
-        fulldirname = path.join(self.spath, dirname)
-        path1 = path.join(fulldirname, 'save')
-        chainname = path.join(path1, self.runfile+'-chain.mc')
+        dirname = 'iteration_' + str(itlabel)
+        fulldirname = self.spath / dirname
+        path1 = fulldirname / 'save'
+        chainname = path1 / self.runfile+'-chain.mc'
 
         # most relevant result for a particular index to return for general use of this function
         avg_gmm_marginal = 0
 
-        # fetch mode and cluster mode are exclusive
-        if not self.bFetchMode:
-            # LM sometimes produces a singular matrix, which we try to avoid
-            fit_counter = 0
-            fit_success = False
-            while not fit_success:
-                # run a new fit, preparations are done in the root directory and the new fit is copied into the
-                # iteration directory, preparations in the iterations directory are not possible, because it would
-                # be lacking a result directory, which is needed for restoring a state/parameters
-                self.molstat.Interactor.fnBackup(target=path.join(self.spath, 'simbackup'))
-                configurations = self.set_sim_pars_for_iteration(it, position)
-                self.molstat.fnSimulateData(mode=self.mode, liConfigurations=configurations, qmin=self.qmin,
-                                            qmax=self.qmax, qrangefromfile=self.qrangefromfile, t_total=self.t_total)
-                self.molstat.Interactor.fnBackup(origin=self.spath, target=fulldirname)
-                # previous save needs to be removed as output serves as flag for HPC job termination
-                if path.isdir(path1):
-                    shutil.rmtree(path1)
-                self.molstat.Interactor.fnRemoveBackup(target=path.join(self.spath, 'simbackup'))
+        # LM sometimes produces a singular matrix, which we try to avoid
+        fit_counter = 0
+        fit_success = False
+        while not fit_success:
+            # run a new fit, preparations are done in the root directory and the new fit is copied into the
+            # iteration directory, preparations in the iterations directory are not possible, because it would
+            # be lacking a result directory, which is needed for restoring a state/parameters
+            self.molstat.Interactor.fnBackup(target=path.join(self.spath, 'simbackup'))
+            configurations = self.set_sim_pars_for_iteration(position)
+            self.molstat.fnSimulateData(mode=self.mode, liConfigurations=configurations, qmin=self.qmin,
+                                        qmax=self.qmax, qrangefromfile=self.qrangefromfile, t_total=self.t_total)
+            self.molstat.Interactor.fnBackup(origin=self.spath, target=fulldirname)
+            # previous save needs to be removed as output serves as flag for HPC job termination
+            if path.isdir(path1):
+                shutil.rmtree(path1)
+            self.molstat.Interactor.fnRemoveBackup(target=path.join(self.spath, 'simbackup'))
 
-                # changing the working directory became necessary at some point for loading the correct data
-                os.chdir(fulldirname)
-                molstat_iter = molstat.CMolStat(fitsource=self.fitsource, spath=fulldirname, mcmcpath='save',
-                                                runfile=self.runfile, load_state=False)
+            # changing the working directory became necessary at some point for loading the correct data
+            os.chdir(fulldirname)
+            molstat_iter = molstat.CMolStat(fitsource=self.fitsource, spath=fulldirname, mcmcpath='save',
+                                            runfile=self.runfile, load_state=False)
 
-                if self.fitter == 'LM':
-                    # copy best-fit parameters from data simulation instance
-                    molstat_iter.Interactor.problem.setp(self.molstat.Interactor.problem.getp())
-                    self.run_fit(molstat_iter, iteration, dirname, fulldirname)
-                    # use covariance matrix for entropy calculation in case of LM
-                    avg_gmm_marginal = self.calc_entropy_for_iteration(molstat_iter, itindex=itindex, cov=True)
-                    fit_counter += 1
-                    if avg_gmm_marginal is not None:
-                        fit_success = True
-                    else:
-                        if fit_counter > 5:
-                            print("Singular matrix encountered for five times in LM.")
-                            print("Assume information gain of zero.")
-                            avg_gmm_marginal = 0
-                            fit_success = True
-                else:
-                    self.run_fit(molstat_iter, iteration, dirname, fulldirname)
-                    fit_counter += 1
+            if self.fitter == 'LM':
+                # copy best-fit parameters from data simulation instance
+                molstat_iter.Interactor.problem.setp(self.molstat.Interactor.problem.getp())
+                self.run_fit(molstat_iter, itlabel, dirname, fulldirname)
+                # use covariance matrix for entropy calculation in case of LM
+                avg_gmm_marginal = self.calc_entropy_for_iteration(molstat_iter, itindex=itindex, cov=True)
+                fit_counter += 1
+                if avg_gmm_marginal is not None:
                     fit_success = True
+                else:
+                    if fit_counter > 5:
+                        print("Singular matrix encountered for five times in LM.")
+                        print("Assume information gain of zero.")
+                        avg_gmm_marginal = 0
+                        fit_success = True
+            else:
+                self.run_fit(molstat_iter, itlabel, dirname, fulldirname)
+                fit_counter += 1
+                fit_success = True
 
-                os.chdir(self.spath)
+            os.chdir(self.spath)
 
-        # Do not run entropy calculation when on cluster, or no valid result, or entropy from covariance via LM.
+        # Do not run entropy calculation when no valid result, or entropy from covariance via LM.
         if self.fitter != 'LM':
             bPriorResultExists = path.isfile(chainname) or path.isfile(chainname + '.gz')
-            if not self.bClusterMode and bPriorResultExists:
+            if  bPriorResultExists:
                 molstat_iter = molstat.CMolStat(fitsource=self.fitsource, spath=fulldirname, mcmcpath='save',
                                                 runfile=self.runfile)
                 avg_gmm_marginal = self.calc_entropy_for_iteration(molstat_iter, itindex=itindex)
 
         # delete big files except in Cluster mode. They are needed there for future fetching
-        if self.remove_fit_dir and not self.bClusterMode:
+        if self.remove_fit_dir:
             shutil.rmtree(fulldirname)
-        elif self.deldir and not self.bClusterMode:
+        elif self.deldir :
             rm_file(path.join(path1, self.runfile+'-point.mc'))
             rm_file(path.join(path1, self.runfile+'-chain.mc'))
             rm_file(path.join(path1, self.runfile+'-stats.mc'))
