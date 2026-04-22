@@ -4,17 +4,13 @@ import numpy
 import numpy as np
 import os
 from pathlib import Path
-import pickle
 import pandas
 import sys
-import matplotlib.pyplot as plt
 import shutil
 
 from numpy.random import permutation
 from os import path, mkdir
-from math import fabs, pow, floor, ceil
-from subprocess import Popen
-from time import sleep
+from math import fabs
 from IPython.display import clear_output
 
 from scattertools.support import molstat
@@ -77,40 +73,6 @@ def convolute(a):
     return conv_arr
 
 
-def nice_interval(start=0, stop=1, step=None, numsteps=10):
-    """
-    Paul Kienzle's method to obtain nicely spaced intervals for plot axes
-    """
-
-    if step is None:
-        step = (stop-start)/numsteps
-
-    sign = 1.0
-    if step < 0:
-        sign = -1.0
-        step = step * (-1)
-
-    if step == 0:
-        return [start, stop+1]
-
-    exponent = floor(np.log(step)/np.log(10))
-    mantisse = step / pow(10, exponent)
-
-    new_mantisse = 1
-    if fabs(mantisse-2) < fabs(mantisse-new_mantisse):
-        new_mantisse = 2
-    if fabs(mantisse-5) < fabs(mantisse-new_mantisse):
-        new_mantisse = 5
-    if fabs(mantisse-10) < fabs(mantisse-new_mantisse):
-        new_mantisse = 10
-
-    new_step = sign * new_mantisse * pow(10, exponent)
-    new_start = floor(start/new_step) * new_step
-    new_stop = ceil(stop/new_step) * new_step
-
-    return np.arange(new_start, new_stop+0.05*new_step, new_step)
-
-
 def rm_file(filename):
     try:
         os.remove(filename)
@@ -126,86 +88,6 @@ def running_mean(current_mean, n, new_point):
 def running_sqstd(current_sqstd, n, new_point, previous_mean, current_mean):
     # see Tony Finch, Incremental calculation of weighted mean and variance
     return (current_sqstd * (n - 1) + (new_point - previous_mean) * (new_point - current_mean)) / n
-
-
-def save_plot_1d(x, y, dy=None, xlabel='', ylabel='', color='blue', filename="plot", ymin=None, ymax=None, levels=5,
-                 niceticks=False, keep_plots=False):
-    import matplotlib.pyplot as plt
-    import matplotlib
-
-    if ymin is None:
-        ymin = np.amin(y)
-    if ymax is None:
-        ymax = np.amax(y)
-
-    font = {'family': 'sans-serif', 'weight': '200', 'size': 14}
-    matplotlib.rc('font', **font)
-
-    fig, ax = plt.subplots()
-    if dy is None:
-        ax.plot(x, y, color=color)
-    else:
-        ax.errorbar(x, y, dy, color=color)
-    if niceticks:
-        bounds = nice_interval(start=ymin, stop=ymax, numsteps=levels)
-        ax.set_yticks(bounds)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.ticklabel_format(scilimits=(-3, 3), useMathText=True)
-
-    plt.tight_layout()
-
-    if keep_plots:
-        i = 0
-        while os.path.isfile(filename + str(i) + '.png'):
-            i += 1
-        filename = filename + str(i)
-
-    plt.savefig(filename + '.pdf')
-    plt.savefig(filename + '.png')
-    plt.close("all")
-
-
-def save_plot_2d(x, y, z, xlabel, ylabel, color, filename='plot', zmin=None, zmax=None, levels=20, mark_maximum=False,
-                 keep_plots=False, support_points=None):
-    import matplotlib.pyplot as plt
-    import matplotlib
-
-    if zmin is None:
-        zmin = np.amin(z)
-    if zmax is None:
-        zmax = np.amax(z)
-    bounds = nice_interval(start=zmin, stop=zmax, numsteps=levels)
-
-    font = {'family': 'sans-serif', 'weight': '200', 'size': 14}
-    matplotlib.rc('font', **font)
-
-    fig, ax = plt.subplots()
-    cs = ax.contourf(x, y, z, cmap=color, vmin=bounds[0], vmax=bounds[-1], levels=bounds, extend='both')
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.ticklabel_format(scilimits=(-3, 3), useMathText=True)
-    fig.colorbar(cs)
-
-    if support_points is not None:
-        plt.scatter(support_points[:, 1], support_points[:, 0], s=10, c='k')
-
-    if mark_maximum:
-        index = np.unravel_index(z.argmax(), z.shape)
-        plt.text(x[index[1]], y[index[0]], 'x', horizontalalignment='center', verticalalignment='center')
-
-    plt.tight_layout()
-
-    if keep_plots:
-        i = 0
-        while os.path.isfile(filename + str(i) + '.png'):
-            i += 1
-        filename = filename + str(i)
-
-    plt.savefig(filename + '.pdf')
-    plt.savefig(filename + '.png')
-    plt.close("all")
-
 
 # calculates entropy while varying a set of parameters in parlist and keeping others fixed as specified in simpar.dat
 # requires a compiled and ready to go fit whose fit parameters are modified and fixed
@@ -490,7 +372,7 @@ class Entropy(Gp):
         else:
             self.pse_path = Path(self.pse_path).expanduser().resolve()
 
-        if optimizer == 'grid':
+        if self.optimizer == 'grid':
             self.results_mvn = np.full(self.steplist, self.priorentropy)
             self.results_gmm = np.full(self.steplist, self.priorentropy)
             self.results_mvn_marginal = np.full(self.steplist, self.priorentropy_marginal)
@@ -507,9 +389,9 @@ class Entropy(Gp):
             self.par_std = np.zeros((len(self.parlist),) + self.results_mvn.shape)
 
             if (self.pse_path / 'MVN_entropy.npy').is_file():
-                self.load_results(spath)
+                self.load_results_grid(spath)
 
-        elif optimizer == 'gpcam' or optimizer == 'gpCAM':
+        elif self.optimizer == 'gpcam' or optimizer == 'gpCAM':
             pass
 
         # call PSE Gp superclass
@@ -533,33 +415,35 @@ class Entropy(Gp):
 
     def calc_entropy(self, molstat=None, cov=False):
 
+        def _init_pars(parnames_dict_keys):
+            independent_pars = []
+            dependent_pars = []
+            parnames = [key for key in parnames_dict_keys]
+            for index in range(len(parnames)):
+                if parnames[index] in self.independent_parameters:
+                    independent_pars.append(index)
+                else:
+                    dependent_pars.append(index)
+            return independent_pars, dependent_pars, parnames
+
         if cov:
             # use covariance matrix indicates that LM fit is present with active molstat, problem and state
             parnames_dict_keys = molstat.Interactor.problem.labels()
-        else:
-            # MCMC fit
-            if molstat is None:
-                molstat = self.molstat
-            points, parnames_dict_keys, logp = molstat.Interactor.fnLoadMCMCResults()
+            independent_pars, dependent_pars, parnames = _init_pars(parnames_dict_keys)
 
-        independent_pars = []
-        dependent_pars = []
-        parnames = [key for key in parnames_dict_keys]
-        for index in range(len(parnames)):
-            if parnames[index] in self.independent_parameters:
-                independent_pars.append(index)
-            else:
-                dependent_pars.append(index)
-
-        if cov:
             mvnentropy = MVN.MVNEntropy(cov=molstat.Interactor.problem.cov())
             gmm_entropy = mvn_entropy = mvnentropy.entropy()
             gmm_entropy_marginal = mvn_entropy_marginal = mvnentropy.marginal_entropy(independent_pars=independent_pars)
 
             points_median = molstat.Interactor.problem.getp()
             points_std = molstat.Interactor.problem.stderr()[0]
-
         else:
+            # MCMC fit
+            if molstat is None:
+                molstat = self.molstat
+            points, parnames_dict_keys, logp = molstat.Interactor.fnLoadMCMCResults()
+            independent_pars, dependent_pars, parnames = _init_pars(parnames_dict_keys)
+
             N_entropy = 10000  # was 10000
             N_norm = 10000  # was 2500
 
@@ -612,7 +496,7 @@ class Entropy(Gp):
         # return MVN entropy, GMM entropy, conditional MVN entropy, conditional GMM entropy
         return mvn_entropy, gmm_entropy, mvn_entropy_marginal, gmm_entropy_marginal, points_median, points_std, parnames
 
-    def calc_entropy_for_iteration(self, molstat_iter, itindex=None, cov=False):
+    def calc_entropy_for_iteration(self, molstat_iter, itlabel: int, cov=False):
         # calculate entropy, dependent parameters == parameters of interest
         # independent parameters == nuisance parameters
         mvn, gmm, mvn_marginal, gmm_marginal, points_median, points_std, parnames = \
@@ -625,12 +509,12 @@ class Entropy(Gp):
                            (self.priorentropy - gmm > (-0.5) * len(self.parlist))
 
         # no special treatment for first entry necessary, algorithm catches this
-        if itindex is not None:
+        if self.optimizer == 'grid':
             if bValidResult:
-                self.gridsearch_writeout_result(itindex, mvn, gmm, mvn_marginal, gmm_marginal, points_median,
+                self.gridsearch_writeout_result(itlabel, mvn, gmm, mvn_marginal, gmm_marginal, points_median,
                                                 points_std, parnames)
             # save results for every iteration
-            self.save_results(self.spath)
+            self.save_results_grid(self.spath)
 
         return gmm_marginal
 
@@ -651,12 +535,12 @@ class Entropy(Gp):
         if self.fitter == 'LM':
             me = []
             for _ in range(self.lm_iterations):
-                marginal_entropy = self.prepare_fit(position=entry['position'], gpiteration=it_label)
+                marginal_entropy = self.prepare_fit(position=entry['position'], itlabel=it_label)
                 me.append(self.priorentropy_marginal - marginal_entropy)
             value = numpy.mean(me)
             variance = numpy.var(me)
         else:
-            marginal_entropy = self.prepare_fit(position=entry['position'], gpiteration=it_label)
+            marginal_entropy = self.prepare_fit(position=entry['position'], itlabel=it_label)
             value = self.priorentropy_marginal - marginal_entropy
             variance = None
 
@@ -667,53 +551,25 @@ class Entropy(Gp):
 
         return value, variance
 
-    def gridsearch_iterate_over_all_indices(self, refinement=False):
-        bWorkedOnIndex = False
-        # the complicated iteration syntax is due the unknown dimensionality of the results space / arrays
-        it = np.nditer(self.results_gmm, flags=['multi_index'])
-        while not it.finished:
-            itindex = it.multi_index
-            # parameter grids can be symmetric, and only one of the symmetry-related indices
-            # will be calculated unless calc_symmetric is True
-            if all(itindex[i] <= itindex[i + 1] for i in range(len(itindex) - 1)) or self.calc_symmetric:
-                # run MCMC if it is first time or the value in results is inf
-                invalid_result = np.isinf(self.results_gmm[itindex]) or fabs(self.results_gmm[itindex]) > 10000
-                insufficient_iterations = self.n_mvn[itindex] < self.miniter
-
-                outlier = False
-                if refinement:
-                    # during refinement, check whether the GMM value follows that of the MVN with respect to its
-                    # nearest neighbors, implemented convolution because of ill-defined origin of scipy convolute
-                    conv_MVN = convolute(self.results_mvn)
-                    conv_GMM = convolute(self.results_gmm)
-                    dMVN = conv_MVN[itindex] - self.results_mvn[itindex]
-                    dGMM = conv_GMM[itindex] - self.results_gmm[itindex]
-                    if fabs(dMVN - dGMM) > self.convergence:
-                        outlier = True
-
-                # Do we need to work on this particular index?
-                if outlier or invalid_result or insufficient_iterations or self.bFetchMode:
-                    bWorkedOnIndex = True
-                    _ = self.work_on_iteration(it=it)
-
-            it.iternext()
-        return bWorkedOnIndex
-
-    def gridsearch_writeout_result(self, _itindex, avg_mvn, avg_gmm, avg_mvn_marginal, avg_gmm_marginal,
+    def gridsearch_writeout_result(self, itlabel: int, avg_mvn, avg_gmm, avg_mvn_marginal, avg_gmm_marginal,
                                    points_median, points_std, parnames):
         # writes out entropy and parameter results into numpy arrays
+
+        # create itindex from itlabel
+        itindex = np.unravel_index(itlabel, self.steplist)
+
         if not self.calc_symmetric:
             # since symmetry-related points in the optimization were not calculated twice, the current
             # result is copied to all permutations without repetition of the parameter index
             # this is convenient for all interchangeable parameters, such as multiple solvent contrasts
             indexlist = []
-            permutated = itertools.permutations(_itindex)
+            permutated = itertools.permutations(itindex)
             for element in permutated:
                 if element not in indexlist:
                     indexlist.append(element)
         else:
             # otherwise copy out to single parameter
-            indexlist = [_itindex]
+            indexlist = [itindex]
 
         for index in indexlist:
             self.n_gmm[index] += 1.0
@@ -748,7 +604,7 @@ class Entropy(Gp):
             self.sqstd_gmm_marginal[index] = running_sqstd(self.sqstd_gmm_marginal[index], n, avg_gmm_marginal,
                                                            old_gmm_marginal, self.results_gmm_marginal[index])
 
-    def load_results(self, dirname):
+    def load_results_grid(self, dirname):
         path1 = path.join(dirname, 'results')
         if self.fitter != 'LM':
             self.results_gmm = np.load(path.join(path1, 'GMM_entropy.npy'))
@@ -799,106 +655,57 @@ class Entropy(Gp):
 
     def plot_results(self, mark_maximum=False):
 
+        super().plot_results(mark_maximum=mark_maximum)
+
+        if self.optimizer != 'grid':
+            return
+
         path1 = path.join(self.spath, 'plots')
         if not path.isdir(path1):
             mkdir(path1)
 
         if self.fitter != 'LM':
-            self.plot_arr(self.results_gmm, arr_variance=np.sqrt(self.sqstd_gmm), vallabel='Entropy [bits]',
-                          filename=path.join(path1, 'GMM_entropy'))
-            self.plot_arr(self.results_gmm_marginal, arr_variance=np.sqrt(self.sqstd_gmm_marginal),
-                          vallabel='Entropy [bits]', filename=path.join(path1, 'GMM_entropy_marginal'))
-            self.plot_arr(self.priorentropy - self.results_gmm, arr_variance=np.sqrt(self.sqstd_gmm),
-                          vallabel='information gain [bits]', filename=path.join(path1, 'GMM_infocontent'), valmin=0,
+            self.plot_array(self.results_gmm, arr_variance=np.sqrt(self.sqstd_gmm), vallabel='Entropy [bits]',
+                              filename=path.join(path1, 'GMM_entropy'))
+            self.plot_array(self.results_gmm_marginal, arr_variance=np.sqrt(self.sqstd_gmm_marginal),
+                              vallabel='Entropy [bits]', filename=path.join(path1, 'GMM_entropy_marginal'))
+            self.plot_array(self.priorentropy - self.results_gmm, arr_variance=np.sqrt(self.sqstd_gmm),
+                              vallabel='information gain [bits]', filename=path.join(path1, 'GMM_infocontent'), valmin=0,
+                              mark_maximum=mark_maximum)
+            self.plot_array(self.priorentropy - self.results_gmm, arr_variance=np.sqrt(self.sqstd_gmm),
+                              vallabel='information gain [bits]', filename=path.join(path1, 'GMM_infocontent'), valmin=0,
+                              mark_maximum=mark_maximum)
+            self.plot_array(self.priorentropy_marginal - self.results_gmm_marginal,
+                              arr_variance=np.sqrt(self.sqstd_gmm_marginal), vallabel='information gain [bits]',
+                              filename=path.join(path1, 'GMM_infocontent_marginal'), valmin=0,
+                              valmax=self.upper_info_plotlevel,
+                              mark_maximum=mark_maximum)
+            self.plot_array(self.n_gmm, vallabel='computations', filename=path.join(path1, 'GMM_n'), valmin=0)
+            self.plot_array(self.n_gmm_marginal, vallabel='computations', filename=path.join(path1, 'GMM_n_marginal'),
+                              valmin=0)
+
+        self.plot_array(self.results_mvn, arr_variance=np.sqrt(self.sqstd_mvn), vallabel='Entropy [bits]',
+                          filename=path.join(path1, 'MVN_entropy'))
+        self.plot_array(self.results_mvn_marginal, arr_variance=np.sqrt(self.sqstd_mvn_marginal),
+                          vallabel='Entropy [bits]', filename=path.join(path1, 'MVN_entropy_marginal'))
+        self.plot_array(self.priorentropy - self.results_mvn, arr_variance=np.sqrt(self.sqstd_mvn),
+                          vallabel='information gain [bits]', filename=path.join(path1, 'MVN_infocontent'), valmin=0,
                           mark_maximum=mark_maximum)
-            self.plot_arr(self.priorentropy - self.results_gmm, arr_variance=np.sqrt(self.sqstd_gmm),
-                          vallabel='information gain [bits]', filename=path.join(path1, 'GMM_infocontent'), valmin=0,
+        self.plot_array(self.priorentropy_marginal - self.results_mvn_marginal,
+                          arr_variance=np.sqrt(self.sqstd_mvn_marginal), vallabel='information gain [bits]',
+                          filename=path.join(path1, 'MVN_infocontent_marginal'), valmin=0, valmax=self.upper_info_plotlevel,
                           mark_maximum=mark_maximum)
-            self.plot_arr(self.priorentropy_marginal - self.results_gmm_marginal,
-                          arr_variance=np.sqrt(self.sqstd_gmm_marginal), vallabel='information gain [bits]',
-                          filename=path.join(path1, 'GMM_infocontent_marginal'), valmin=0,
-                          valmax=self.upper_info_plotlevel,
-                          mark_maximum=mark_maximum)
-            self.plot_arr(self.n_gmm, vallabel='computations', filename=path.join(path1, 'GMM_n'), valmin=0)
-            self.plot_arr(self.n_gmm_marginal, vallabel='computations', filename=path.join(path1, 'GMM_n_marginal'),
+        self.plot_array(self.n_mvn, vallabel='computations', filename=path.join(path1, 'MVN_n'), valmin=0)
+        self.plot_array(self.n_mvn_marginal, vallabel='computations', filename=path.join(path1, 'MVN_n_marginal'),
                           valmin=0)
 
-        self.plot_arr(self.results_mvn, arr_variance=np.sqrt(self.sqstd_mvn), vallabel='Entropy [bits]',
-                      filename=path.join(path1, 'MVN_entropy'))
-        self.plot_arr(self.results_mvn_marginal, arr_variance=np.sqrt(self.sqstd_mvn_marginal),
-                      vallabel='Entropy [bits]', filename=path.join(path1, 'MVN_entropy_marginal'))
-        self.plot_arr(self.priorentropy - self.results_mvn, arr_variance=np.sqrt(self.sqstd_mvn),
-                      vallabel='information gain [bits]', filename=path.join(path1, 'MVN_infocontent'), valmin=0,
-                      mark_maximum=mark_maximum)
-        self.plot_arr(self.priorentropy_marginal - self.results_mvn_marginal,
-                      arr_variance=np.sqrt(self.sqstd_mvn_marginal), vallabel='information gain [bits]',
-                      filename=path.join(path1, 'MVN_infocontent_marginal'), valmin=0, valmax=self.upper_info_plotlevel,
-                      mark_maximum=mark_maximum)
-        self.plot_arr(self.n_mvn,  vallabel='computations', filename=path.join(path1, 'MVN_n'), valmin=0)
-        self.plot_arr(self.n_mvn_marginal,  vallabel='computations', filename=path.join(path1, 'MVN_n_marginal'),
-                      valmin=0)
-
         for i, parname in enumerate(self.parlist):
-            self.plot_arr(self.par_median[i], arr_variance=self.par_std[i], vallabel=parname,
-                          filename=path.join(path1, 'Par_' + parname + '_median'))
-            self.plot_arr(self.par_std[i], arr_variance=None, vallabel=parname,
-                          filename=path.join(path1, 'Par_' + parname + '_std'))
+            self.plot_array(self.par_median[i], arr_variance=self.par_std[i], vallabel=parname,
+                              filename=path.join(path1, 'Par_' + parname + '_median'))
+            self.plot_array(self.par_std[i], arr_variance=None, vallabel=parname,
+                              filename=path.join(path1, 'Par_' + parname + '_std'))
 
-    def plot_arr(self, arr_value, arr_variance=None, filename='plot', mark_maximum=False, valmin=None, valmax=None,
-                 levels=20, niceticks=False, vallabel='z', support_points=None):
-        # onecolormaps = [plt.cm.Greys, plt.cm.Purples, plt.cm.Blues, plt.cm.Greens, plt.cm.Oranges, plt.cm.Reds]
-        ec = plt.cm.coolwarm
-
-        path1 = path.join(self.spath, 'plots')
-
-        if len(arr_value.shape) == 1:
-            ax0 = self.axes[0]
-            sp0 = self.steppar['unique_name'].tolist()[0]
-            if arr_variance is not None:
-                dy = np.sqrt(arr_variance)
-            else:
-                dy = None
-            save_plot_1d(ax0, arr_value, dy=dy, xlabel=sp0, ylabel=vallabel, filename=path.join(path1, filename),
-                         ymin=valmin, ymax=valmax, levels=levels, niceticks=niceticks, keep_plots=self.keep_plots)
-
-        elif len(arr_value.shape) == 2:
-            # numpy array and plot axes are reversed
-            ax1 = self.axes[0]
-            ax0 = self.axes[1]
-            sp1 = self.steppar['unique_name'].tolist()[0]
-            sp0 = self.steppar['unique_name'].tolist()[1]
-            save_plot_2d(ax0, ax1, arr_value, xlabel=sp0, ylabel=sp1, color=ec,
-                         filename=path.join(path1, filename), zmin=valmin, zmax=valmax, levels=levels,
-                         mark_maximum=mark_maximum, keep_plots=self.keep_plots, support_points=support_points)
-
-        elif len(arr_value.shape) == 3 and arr_value.shape[0] < 6:
-            ax2 = self.axes[1]
-            ax1 = self.axes[2]
-            sp2 = self.steppar['unique_name'].tolist()[1]
-            sp1 = self.steppar['unique_name'].tolist()[2]
-            for slice_n in range(arr_value.shape[0]):
-                save_plot_2d(ax1, ax2, arr_value[slice_n], xlabel=sp1, ylabel=sp2, color=ec,
-                             filename=path.join(path1, filename+'_'+str(slice_n)), zmin=valmin, zmax=valmax,
-                             levels=levels, mark_maximum=mark_maximum, keep_plots=self.keep_plots)
-
-        if len(arr_value.shape) >= 3:
-            # plot projections onto two parameters at a time
-            for i in range(len(self.steppar)):
-                for j in range(i):
-                    ax2 = self.axes[i]
-                    ax1 = self.axes[j]
-                    sp2 = self.steppar['unique_name'].tolist()[i]
-                    sp1 = self.steppar['unique_name'].tolist()[j]
-                    projection = np.empty((self.steplist[i], self.steplist[j]))
-                    for k in range(self.steplist[i]):
-                        for ll in range(self.steplist[j]):
-                            projection[k, ll] = np.take(np.take(arr_value, indices=k, axis=i), indices=ll, axis=j).max()
-                    save_plot_2d(ax1, ax2, projection, xlabel=sp1, ylabel=sp2, color=ec,
-                                 filename=path.join(path1, filename+'_'+sp1+'_'+sp2), zmin=valmin, zmax=valmax,
-                                 levels=levels, mark_maximum=mark_maximum, keep_plots=self.keep_plots)
-
-
-    def save_results(self, dirname):
+    def save_results_grid(self, dirname):
         path1 = path.join(dirname, 'results')
         if not path.isdir(path1):
             mkdir(path1)
@@ -1078,7 +885,7 @@ class Entropy(Gp):
                     else:
                         print('Parameter with background rule cannot be varied!')
                         print('Parameter: ', row.unique_name)
-                        sys.exit(1)
+                        raise RuntimeError('Parameter with background rule cannot be varied!')
                 else:
                     # must be instrument parameter
                     configurations = _fill_config(configurations, row.par, simvalue, row.dataset, row.configuration)
@@ -1106,13 +913,11 @@ class Entropy(Gp):
                     configurations = _set_background(configurations, row.dataset, row.configuration, simvalue)
 
         simparsave = self.simpar.loc[:, ['par', 'value']]
-        simparsave.to_csv(path.join(self.spath, 'simpar.dat'), sep=' ', header=None, index=False)
+        simparsave.to_csv(self.spath / 'simpar.dat', sep=' ', header=None, index=False)
         return configurations
 
 
     def prepare_fit(self, position, itlabel: str):
-
-        itindex = None
 
         dirname = 'iteration_' + str(itlabel)
         fulldirname = self.spath / dirname
@@ -1129,7 +934,7 @@ class Entropy(Gp):
             # run a new fit, preparations are done in the root directory and the new fit is copied into the
             # iteration directory, preparations in the iterations directory are not possible, because it would
             # be lacking a result directory, which is needed for restoring a state/parameters
-            self.molstat.Interactor.fnBackup(target=path.join(self.spath, 'simbackup'))
+            self.molstat.Interactor.fnBackup(target=self.spath / 'simbackup')
             configurations = self.set_sim_pars_for_iteration(position)
             self.molstat.fnSimulateData(mode=self.mode, liConfigurations=configurations, qmin=self.qmin,
                                         qmax=self.qmax, qrangefromfile=self.qrangefromfile, t_total=self.t_total)
@@ -1149,7 +954,7 @@ class Entropy(Gp):
                 molstat_iter.Interactor.problem.setp(self.molstat.Interactor.problem.getp())
                 self.run_fit(molstat_iter, itlabel, dirname, fulldirname)
                 # use covariance matrix for entropy calculation in case of LM
-                avg_gmm_marginal = self.calc_entropy_for_iteration(molstat_iter, itindex=itindex, cov=True)
+                avg_gmm_marginal = self.calc_entropy_for_iteration(molstat_iter, itlabel=itlabel, cov=True)
                 fit_counter += 1
                 if avg_gmm_marginal is not None:
                     fit_success = True
@@ -1172,7 +977,7 @@ class Entropy(Gp):
             if  bPriorResultExists:
                 molstat_iter = molstat.CMolStat(fitsource=self.fitsource, spath=fulldirname, mcmcpath='save',
                                                 runfile=self.runfile)
-                avg_gmm_marginal = self.calc_entropy_for_iteration(molstat_iter, itindex=itindex)
+                avg_gmm_marginal = self.calc_entropy_for_iteration(molstat_iter, itlabel=itlabel)
 
         # delete big files except in Cluster mode. They are needed there for future fetching
         if self.remove_fit_dir:

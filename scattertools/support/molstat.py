@@ -107,7 +107,6 @@ class CMolStat:
         self.fMolgroupsNormArea = 0
         # check for system and type of setup file
 
-        self.Interactor = None
         if self.fitsource == "bumps":
             from scattertools.support import api_bumps
             self.Interactor = api_bumps.CBumpsAPI(self.spath, self.mcmcpath, self.runfile, state, problem,
@@ -121,6 +120,8 @@ class CMolStat:
         elif self.fitsource == 'SASView':
             from scattertools.support import api_sasview
             self.Interactor = api_sasview.CSASViewAPI(self.spath, self.mcmcpath, self.runfile, load_state=load_state)
+        else:
+            raise RuntimeError(f"Unknown fitsource : {self.fitsource}")
 
         # mirror problem attribute in the top-level object for convenience
         self.problem = self.Interactor.problem
