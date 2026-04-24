@@ -1,5 +1,6 @@
 from __future__ import print_function
 from os import path
+from pathlib import Path
 from random import seed, random
 from re import VERBOSE, IGNORECASE, compile
 from sys import stdout
@@ -74,17 +75,19 @@ class CBumpsAPI(api_base.CBaseAPI):
 
     def fnBackup(self, origin=None, target=None):
         if origin is None:
-            origin = self.spath
+            origin = Path(self.spath).expanduser().resolve()
+        else:
+            origin = Path(origin).expanduser().resolve()
         if target is None:
-            target = self.spath + '/rsbackup'
-        if not path.isdir(target):
-            os.mkdir(target)
-        for file in glob.glob(origin + r'/*.dat'):
-            shutil.copy(file, target)
-        for file in glob.glob(origin + r'/*.py'):
-            shutil.copy(file, target)
-        for file in glob.glob(origin + r'/*.pyc'):
-            shutil.copy(file, target)
+            target = (Path(self.spath).expanduser().resolve()) / 'rsbackup'
+        else:
+            target = Path(target).expanduser().resolve()
+
+        target.mkdir(parents=True, exist_ok=True)
+
+        for pattern in ('*.dat', '*.py', '*.pyc'):
+            for file in origin.glob(pattern):
+                shutil.copy(file, target)
 
     def fnGetAllParameterNames(self, model: int = 0):
         """

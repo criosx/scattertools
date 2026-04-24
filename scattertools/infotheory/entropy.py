@@ -18,6 +18,7 @@ from scattertools.infotheory import MVN
 from scattertools.infotheory import GMM
 
 from pse.gp import Gp
+from pse.gp_server import GpServer
 
 
 # static methods
@@ -89,6 +90,14 @@ def running_sqstd(current_sqstd, n, new_point, previous_mean, current_mean):
     # see Tony Finch, Incremental calculation of weighted mean and variance
     return (current_sqstd * (n - 1) + (new_point - previous_mean) * (new_point - current_mean)) / n
 
+# Derive the server class using the Entropy(Gp) object below
+class Entropy_server(GpServer):
+    def __init__(self, **kwargs):
+        super().__init__()
+
+    def pse_go(self, data, from_pause=False):
+        return self.start_Gp_thread(data, from_pause=from_pause, gpobject=Entropy)
+
 # calculates entropy while varying a set of parameters in parlist and keeping others fixed as specified in simpar.dat
 # requires a compiled and ready to go fit whose fit parameters are modified and fixed
 # avoid_symmetric prevents calculating symmetry-related results by enforcing the indices of varied parameters
@@ -99,7 +108,7 @@ class Entropy(Gp):
                  fitsource,
                  spath,
                  mcmcpath,
-                 runfile,
+                 runfile: str,
                  mcmcburn=16000,
                  mcmcsteps=5000,
                  deldir=True,
@@ -185,8 +194,8 @@ class Entropy(Gp):
                 'n * * cuvette_thickness 0.2 0 0 0.02 4.1 0.1'
         ]
         If provided directly as a Pandas dataframe, here are the header names:
-        header_names = ['type', 'dataset', 'configuration', 'par', 'value', 'l_fit', 'u_fit', 'l_sim', 'u_sim',
-                        'step_sim']
+        header_names = ['type', 'dataset', 'configuration', 'par', 'value', 'l_fit', 'u_fit', 'l_opt', 'u_opt',
+                        'step_opt']
 
         * Data filenames are currently limited to sim.dat for a single file fit, or simx.dat, x = 0 ... n, for fits
         with multiple data sets
@@ -196,8 +205,9 @@ class Entropy(Gp):
                         which the information will be read.
 
         :param fitsource:               CMolStat fitsource
-        :param spath:                   CMolStat spath
-        :param mcmcpath:                CMolStat mcmcpath
+        :param spath:                   CMolStat spath. This is where a prepared fit is provided.
+        :param mcmcpath:                CMolStat mcmcpath. A MCMC storage directory within spath for reloading a
+                                        problem.
         :param runfile:                 CMolStat runfile
 
         :param mcmcburn:
@@ -238,7 +248,7 @@ class Entropy(Gp):
 
         # initialize molstat
         self.fitsource = fitsource
-        self.spath = Path(spath).expanduser().resolve()
+        self.molstat_path = Path(spath).expanduser().resolve()
         self.mcmcpath = mcmcpath
         self.runfile = runfile
         self.molstat = molstat.CMolStat(fitsource=fitsource, spath=spath, mcmcpath=mcmcpath, runfile=runfile)
@@ -295,8 +305,8 @@ class Entropy(Gp):
                 filepath = 'entropypar.dat'
             else:
                 filepath = Path(exp_par).expanduser().resolve()
-            header_names = ['type', 'dataset', 'configuration', 'par', 'value', 'l_fit', 'u_fit', 'l_sim', 'u_sim',
-                            'step_sim']
+            header_names = ['type', 'dataset', 'configuration', 'par', 'value', 'l_fit', 'u_fit', 'l_opt', 'u_opt',
+                            'step_opt']
             self.allpar = pandas.read_csv(filepath, sep='\s+', header=None, names=header_names,  skip_blank_lines=True,
                                           comment='#')
 
@@ -340,15 +350,16 @@ class Entropy(Gp):
         self.steppar = self.allpar.dropna(axis=0)
 
         # now, bring steppar in line with PSE Gp's requirements for the search space
-        self.pse_par = self.steppar.loc[:, ['unique_name', 'value', 'l_sim', 'u_sim', 'step_sim']].rename(
+        self.pse_par = self.steppar.loc[:, ['unique_name', 'value', 'l_opt', 'u_opt', 'step_opt']].rename(
             columns={
                 'unique_name': 'name',
-                'l_sim': 'lower_opt',
-                'u_sim': 'upper_opt',
-                'step_sim': 'step_opt'
+                'l_opt': 'lower_opt',
+                'u_opt': 'upper_opt',
+                'step_opt': 'step_opt'
             }
         )
         self.pse_par['type'] = 'parameter'
+        self.pse_par['optimize'] = True
 
         # create data frame for simpar.dat needed by the data simulation routines
         # non-parameters such as qrange and prefactor will be included in simpar, but eventually ignored
@@ -358,17 +369,17 @@ class Entropy(Gp):
         self.steplist = []
         self.axes = []
         for row in self.steppar.itertuples():
-            steps = int((row.u_sim - row.l_sim) / row.step_sim) + 1
+            steps = int((row.u_opt - row.l_opt) / row.step_opt) + 1
             self.steplist.append(steps)
             axis = []
             for i in range(steps):
-                axis.append(row.l_sim + i * row.step_sim)
+                axis.append(row.l_opt + i * row.step_opt)
             self.axes.append(axis)
 
         self.priorentropy, self.priorentropy_marginal = self.calc_prior()
 
         if self.pse_path is None:
-            self.pse_path = self.spath / 'results'
+            self.pse_path = self.molstat_path / 'results'
         else:
             self.pse_path = Path(self.pse_path).expanduser().resolve()
 
@@ -514,7 +525,7 @@ class Entropy(Gp):
                 self.gridsearch_writeout_result(itlabel, mvn, gmm, mvn_marginal, gmm_marginal, points_median,
                                                 points_std, parnames)
             # save results for every iteration
-            self.save_results_grid(self.spath)
+            self.save_results_grid(self.molstat_path)
 
         return gmm_marginal
 
@@ -542,7 +553,7 @@ class Entropy(Gp):
         else:
             marginal_entropy = self.prepare_fit(position=entry['position'], itlabel=it_label)
             value = self.priorentropy_marginal - marginal_entropy
-            variance = None
+            variance = 0
 
         # THESE THREE LINES NEED DO BE PRESENT IN EVERY DERIVED METHOD
         entry['value'] = value
@@ -604,6 +615,22 @@ class Entropy(Gp):
             self.sqstd_gmm_marginal[index] = running_sqstd(self.sqstd_gmm_marginal[index], n, avg_gmm_marginal,
                                                            old_gmm_marginal, self.results_gmm_marginal[index])
 
+    def gp_hardware_intitialzation(self):
+        """
+        Method to be implemented in each subclass that initializes the measurement hardware.
+        No hardware for this subclass.
+        :return: (bool) True if successful, False otherwise.
+        """
+        return True
+
+    def gp_hardware_shutdown(self):
+        """
+        Method to be implemented in each subclass that shuts down the measurement hardware.
+        No hardware for this subclass.
+        :return: (bool) True if successful, False otherwise.
+        """
+        return True
+
     def load_results_grid(self, dirname):
         path1 = path.join(dirname, 'results')
         if self.fitter != 'LM':
@@ -660,7 +687,7 @@ class Entropy(Gp):
         if self.optimizer != 'grid':
             return
 
-        path1 = path.join(self.spath, 'plots')
+        path1 = path.join(self.molstat_path, 'plots')
         if not path.isdir(path1):
             mkdir(path1)
 
@@ -861,8 +888,8 @@ class Entropy(Gp):
             simvalue = None
             # is it a parameter to iterate over?
             if row.unique_name in self.steppar['unique_name'].tolist():
-                lsim = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'l_sim'].iloc[0]
-                stepsim = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'step_sim'].iloc[0]
+                lsim = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'l_opt'].iloc[0]
+                stepsim = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'step_opt'].iloc[0]
                 value = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'value'].iloc[0]
                 lfit = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'l_fit'].iloc[0]
                 ufit = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'u_fit'].iloc[0]
@@ -913,16 +940,16 @@ class Entropy(Gp):
                     configurations = _set_background(configurations, row.dataset, row.configuration, simvalue)
 
         simparsave = self.simpar.loc[:, ['par', 'value']]
-        simparsave.to_csv(self.spath / 'simpar.dat', sep=' ', header=None, index=False)
+        simparsave.to_csv(self.molstat_path / 'simpar.dat', sep=' ', header=None, index=False)
         return configurations
 
 
-    def prepare_fit(self, position, itlabel: str):
+    def prepare_fit(self, position, itlabel: int):
 
         dirname = 'iteration_' + str(itlabel)
-        fulldirname = self.spath / dirname
+        fulldirname = self.molstat_path / dirname
         path1 = fulldirname / 'save'
-        chainname = path1 / self.runfile+'-chain.mc'
+        chainname = path1 / (self.runfile+'-chain.mc')
 
         # most relevant result for a particular index to return for general use of this function
         avg_gmm_marginal = 0
@@ -934,15 +961,15 @@ class Entropy(Gp):
             # run a new fit, preparations are done in the root directory and the new fit is copied into the
             # iteration directory, preparations in the iterations directory are not possible, because it would
             # be lacking a result directory, which is needed for restoring a state/parameters
-            self.molstat.Interactor.fnBackup(target=self.spath / 'simbackup')
+            self.molstat.Interactor.fnBackup(target=self.molstat_path / 'simbackup')
             configurations = self.set_sim_pars_for_iteration(position)
             self.molstat.fnSimulateData(mode=self.mode, liConfigurations=configurations, qmin=self.qmin,
                                         qmax=self.qmax, qrangefromfile=self.qrangefromfile, t_total=self.t_total)
-            self.molstat.Interactor.fnBackup(origin=self.spath, target=fulldirname)
+            self.molstat.Interactor.fnBackup(origin=self.molstat_path, target=fulldirname)
             # previous save needs to be removed as output serves as flag for HPC job termination
             if path.isdir(path1):
                 shutil.rmtree(path1)
-            self.molstat.Interactor.fnRemoveBackup(target=path.join(self.spath, 'simbackup'))
+            self.molstat.Interactor.fnRemoveBackup(target=path.join(self.molstat_path, 'simbackup'))
 
             # changing the working directory became necessary at some point for loading the correct data
             os.chdir(fulldirname)
@@ -969,11 +996,11 @@ class Entropy(Gp):
                 fit_counter += 1
                 fit_success = True
 
-            os.chdir(self.spath)
+            os.chdir(self.molstat_path)
 
         # Do not run entropy calculation when no valid result, or entropy from covariance via LM.
         if self.fitter != 'LM':
-            bPriorResultExists = path.isfile(chainname) or path.isfile(chainname + '.gz')
+            bPriorResultExists = path.isfile(str(chainname)) or path.isfile(str(chainname) + '.gz')
             if  bPriorResultExists:
                 molstat_iter = molstat.CMolStat(fitsource=self.fitsource, spath=fulldirname, mcmcpath='save',
                                                 runfile=self.runfile)
