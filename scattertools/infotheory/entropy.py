@@ -298,6 +298,8 @@ class Entropy(Gp):
 
         # Use provided experimental optimization pars or load from file entropypar.dat
         if isinstance(exp_par, pandas.DataFrame):
+            # change to canonical names, if necessary
+            exp_par = exp_par.rename(columns={'config.': 'configuration', 'parameter': 'par'})
             self.allpar = exp_par
             # TODO: Checks on provided data
         else:
