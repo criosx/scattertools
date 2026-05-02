@@ -127,7 +127,7 @@ class Entropy(Gp):
                  upper_info_plotlevel=None,
                  plotlimits_filename='',
                  jupyter_clear_output=False,
-                 pse_path = None,
+                 storage_path = None,
                  acq_func="variance",
                  gpcam_iterations=50,
                  gpcam_init_dataset_size=20,
@@ -229,7 +229,7 @@ class Entropy(Gp):
         :param plotlimits_filename:
         :param jupyter_clear_output:
 
-        :param pse_path:                PSE Gp storage_path
+        :param storage_path:            PSE Gp storage_path
         :param acq_func:                PSE Gp acq_func
         :param gpcam_iterations:        PSE Gp gpcam_iterations
         :param gpcam_init_dataset_size: PSE Gp gpcam_init_dataset_size
@@ -263,7 +263,7 @@ class Entropy(Gp):
         self.remove_fit_dir = remove_fit_dir
 
         # PSE object arguments
-        self.pse_path = pse_path
+        self.pse_path = storage_path
         self.acq_func = acq_func
         self.gpcam_iterations = gpcam_iterations
         self.gpcam_init_dataset_size = gpcam_init_dataset_size
