@@ -300,6 +300,10 @@ class Entropy(Gp):
         self.mode = mode
         self.calc_symmetric = calc_symmetric
 
+        # in case we receive the dataframe as a JSONified dict or list
+        if isinstance(exp_par, dict) or isinstance(exp_par, list):
+            exp_par = pandas.DataFrame(exp_par)
+
         # Use provided experimental optimization pars or load from file entropypar.dat
         if isinstance(exp_par, pandas.DataFrame):
             # change to canonical names, if necessary
