@@ -96,6 +96,10 @@ class Entropy_server(GpServer):
         super().__init__()
 
     def pse_go(self, data, from_pause=False):
+        # TODO: Remove this test after a full elimination of the client argument has been implemented via consistent
+        #  subclassing of GP_server
+        if 'client' in data:
+            del data['client']
         return self.start_Gp_thread(data, from_pause=from_pause, gpobject=Entropy)
 
 # calculates entropy while varying a set of parameters in parlist and keeping others fixed as specified in simpar.dat
