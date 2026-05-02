@@ -117,7 +117,7 @@ class CMolStat:
         elif self.fitsource == 'garefl':
             from scattertools.support import api_garefl
             self.Interactor = api_garefl.CGaReflAPI(self.spath, self.mcmcpath, self.runfile, load_state=load_state)
-        elif self.fitsource == 'SASView':
+        elif self.fitsource == 'SASView' or self.fitsource == 'sasview':
             from scattertools.support import api_sasview
             self.Interactor = api_sasview.CSASViewAPI(self.spath, self.mcmcpath, self.runfile, load_state=load_state)
         else:
