@@ -529,7 +529,7 @@ class Entropy(Gp):
                 self.gridsearch_writeout_result(itlabel, mvn, gmm, mvn_marginal, gmm_marginal, points_median,
                                                 points_std, parnames)
             # save results for every iteration
-            self.save_results_grid(self.molstat_path)
+            self.save_results_grid(self.storage_path)
 
         return gmm_marginal
 
@@ -691,7 +691,7 @@ class Entropy(Gp):
         if self.optimizer != 'grid':
             return
 
-        path1 = path.join(self.molstat_path, 'plots')
+        path1 = path.join(self.storage_path, 'plots')
         if not path.isdir(path1):
             mkdir(path1)
 
@@ -944,14 +944,14 @@ class Entropy(Gp):
                     configurations = _set_background(configurations, row.dataset, row.configuration, simvalue)
 
         simparsave = self.simpar.loc[:, ['par', 'value']]
-        simparsave.to_csv(self.molstat_path / 'simpar.dat', sep=' ', header=None, index=False)
+        simparsave.to_csv(self.storage_path / 'simpar.dat', sep=' ', header=None, index=False)
         return configurations
 
 
     def prepare_fit(self, position, itlabel: int):
 
         dirname = 'iteration_' + str(itlabel)
-        fulldirname = self.molstat_path / dirname
+        fulldirname = self.storage_path / dirname
         path1 = fulldirname / 'save'
         chainname = path1 / (self.runfile+'-chain.mc')
 
@@ -965,15 +965,15 @@ class Entropy(Gp):
             # run a new fit, preparations are done in the root directory and the new fit is copied into the
             # iteration directory, preparations in the iterations directory are not possible, because it would
             # be lacking a result directory, which is needed for restoring a state/parameters
-            self.molstat.Interactor.fnBackup(target=self.molstat_path / 'simbackup')
+            self.molstat.Interactor.fnBackup(target=self.storage_path / 'simbackup')
             configurations = self.set_sim_pars_for_iteration(position)
             self.molstat.fnSimulateData(mode=self.mode, liConfigurations=configurations, qmin=self.qmin,
                                         qmax=self.qmax, qrangefromfile=self.qrangefromfile, t_total=self.t_total)
-            self.molstat.Interactor.fnBackup(origin=self.molstat_path, target=fulldirname)
+            self.molstat.Interactor.fnBackup(origin=self.storage_path, target=fulldirname)
             # previous save needs to be removed as output serves as flag for HPC job termination
             if path.isdir(path1):
                 shutil.rmtree(path1)
-            self.molstat.Interactor.fnRemoveBackup(target=path.join(self.molstat_path, 'simbackup'))
+            self.molstat.Interactor.fnRemoveBackup(target=path.join(self.storage_path, 'simbackup'))
 
             # changing the working directory became necessary at some point for loading the correct data
             os.chdir(fulldirname)
@@ -1000,7 +1000,7 @@ class Entropy(Gp):
                 fit_counter += 1
                 fit_success = True
 
-            os.chdir(self.molstat_path)
+            os.chdir(self.storage_path)
 
         # Do not run entropy calculation when no valid result, or entropy from covariance via LM.
         if self.fitter != 'LM':
