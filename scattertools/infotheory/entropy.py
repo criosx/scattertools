@@ -309,6 +309,9 @@ class Entropy(Gp):
             # change to canonical names, if necessary
             exp_par = exp_par.rename(columns={'config.': 'configuration', 'parameter': 'par'})
             self.allpar = exp_par
+            cols = ["value", "l_fit", "u_fit", "l_opt", "u_opt", "step_opt"]
+            for col in cols:
+                self.allpar[col] = pandas.to_numeric(self.allpar[col], errors="coerce")
             # TODO: Checks on provided data
         else:
             if exp_par is None:
