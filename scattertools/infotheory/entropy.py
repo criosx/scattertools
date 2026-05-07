@@ -110,8 +110,7 @@ class Entropy(Gp):
     def __init__(self,
                  exp_par,
                  fitsource,
-                 spath,
-                 mcmcpath,
+                 storage_path,
                  runfile: str,
                  mcmcburn=16000,
                  mcmcsteps=5000,
@@ -131,7 +130,6 @@ class Entropy(Gp):
                  upper_info_plotlevel=None,
                  plotlimits_filename='',
                  jupyter_clear_output=False,
-                 storage_path = None,
                  acq_func="variance",
                  gpcam_iterations=50,
                  gpcam_init_dataset_size=20,
@@ -209,11 +207,8 @@ class Entropy(Gp):
                         which the information will be read.
 
         :param fitsource:               CMolStat fitsource
-        :param spath:                   CMolStat spath. This is where a prepared fit is provided.
-        :param mcmcpath:                CMolStat mcmcpath. A MCMC storage directory within spath for reloading a
-                                        problem.
+        :param storage_path:            CMolStat spath. This is where a prepared fit is provided.
         :param runfile:                 CMolStat runfile
-
         :param mcmcburn:
         :param mcmcsteps:
         :param deldir:
@@ -252,10 +247,9 @@ class Entropy(Gp):
 
         # initialize molstat
         self.fitsource = fitsource
-        self.molstat_path = Path(spath).expanduser().resolve()
-        self.mcmcpath = mcmcpath
+        self.storage_path = Path(storage_path).expanduser().resolve()
         self.runfile = runfile
-        self.molstat = molstat.CMolStat(fitsource=fitsource, spath=spath, mcmcpath=mcmcpath, runfile=runfile)
+        self.molstat = molstat.CMolStat(fitsource=fitsource, spath=storage_path, mcmcpath='MCMC', runfile=runfile)
 
         # arguments for running the fit
         self.mcmcburn = mcmcburn
@@ -267,7 +261,6 @@ class Entropy(Gp):
         self.remove_fit_dir = remove_fit_dir
 
         # PSE object arguments
-        self.pse_path = storage_path
         self.acq_func = acq_func
         self.gpcam_iterations = gpcam_iterations
         self.gpcam_init_dataset_size = gpcam_init_dataset_size
@@ -300,10 +293,9 @@ class Entropy(Gp):
         self.mode = mode
         self.calc_symmetric = calc_symmetric
 
-        # in case we receive the dataframe as a JSONified dict or list
+        # in case we receive the experimental optimization pars as a JSONified dict or list convert to Pandas dataframe
         if isinstance(exp_par, dict) or isinstance(exp_par, list):
             exp_par = pandas.DataFrame(exp_par)
-
         # Use provided experimental optimization pars or load from file entropypar.dat
         if isinstance(exp_par, pandas.DataFrame):
             # change to canonical names, if necessary
@@ -312,7 +304,6 @@ class Entropy(Gp):
             cols = ["value", "l_fit", "u_fit", "l_opt", "u_opt", "step_opt"]
             for col in cols:
                 self.allpar[col] = pandas.to_numeric(self.allpar[col], errors="coerce")
-            # TODO: Checks on provided data
         else:
             if exp_par is None:
                 filepath = 'entropypar.dat'
@@ -391,11 +382,6 @@ class Entropy(Gp):
 
         self.priorentropy, self.priorentropy_marginal = self.calc_prior()
 
-        if self.pse_path is None:
-            self.pse_path = self.molstat_path / 'results'
-        else:
-            self.pse_path = Path(self.pse_path).expanduser().resolve()
-
         if self.optimizer == 'grid':
             self.results_mvn = np.full(self.steplist, self.priorentropy)
             self.results_gmm = np.full(self.steplist, self.priorentropy)
@@ -412,15 +398,15 @@ class Entropy(Gp):
             self.par_median = np.zeros((len(self.parlist),) + self.results_mvn.shape)
             self.par_std = np.zeros((len(self.parlist),) + self.results_mvn.shape)
 
-            if (self.pse_path / 'MVN_entropy.npy').is_file():
-                self.load_results_grid(spath)
+            if (self.storage_path / 'MVN_entropy.npy').is_file():
+                self.load_results_grid(str(self.storage_path))
 
         elif self.optimizer == 'gpcam' or optimizer == 'gpCAM':
             pass
 
         # call PSE Gp superclass
         super().__init__(exp_par=self.pse_par,
-                         storage_path=self.pse_path,
+                         storage_path=self.storage_path,
                          acq_func=self.acq_func,
                          gpcam_iterations=self.gpcam_iterations,
                          gpcam_init_dataset_size=self.gpcam_init_dataset_size,
