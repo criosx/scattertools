@@ -319,6 +319,7 @@ class CBumpsAPI(api_base.CBaseAPI):
 
     def fnRestoreFitProblem(self):
         if path.isfile(os.path.join(self.spath, self.runfile + ".py")):
+            print(f'Here is the problem file: {os.path.join(self.spath, self.runfile + ".py")}')
             problem = load_problem(os.path.join(self.spath, self.runfile + ".py"))
         else:
             print("No file: " + os.path.join(self.spath, self.runfile + ".py"))
