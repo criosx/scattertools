@@ -103,8 +103,8 @@ class Entropy_server(GpServer):
 
         # change current working directory to storage directory, as we will initialize a molstat fit there (at first,
         # before later running subsequent fits in subdirectories)
-        storage_dir = Path(data['storage_dir']).expanduser().resolve()
-        os.chdir(storage_dir)
+        storage_path = Path(data['storage_path']).expanduser().resolve()
+        os.chdir(storage_path)
         return self.start_Gp_thread(data, from_pause=from_pause, gpobject=Entropy)
 
 # calculates entropy while varying a set of parameters in parlist and keeping others fixed as specified in simpar.dat
