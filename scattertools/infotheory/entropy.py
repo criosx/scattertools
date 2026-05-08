@@ -561,7 +561,7 @@ class Entropy(Gp):
         else:
             marginal_entropy = self.prepare_fit(position=entry['position'], itlabel=it_label)
             value = self.priorentropy_marginal - marginal_entropy
-            variance = 0
+            variance = 0.01
 
         # THESE THREE LINES NEED DO BE PRESENT IN EVERY DERIVED METHOD
         entry['value'] = value
