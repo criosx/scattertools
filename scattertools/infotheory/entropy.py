@@ -253,7 +253,11 @@ class Entropy(Gp):
         # initialize molstat
         self.fitsource = fitsource
         self.storage_path = Path(storage_path).expanduser().resolve()
-        self.runfile = runfile
+
+        # remove .py suffix if present for runfile
+        p = Path(runfile)
+        self.runfile = p.stem if p.suffix == ".py" else runfile
+
         self.molstat = molstat.CMolStat(fitsource=fitsource, spath=storage_path, mcmcpath='MCMC', runfile=runfile)
 
         # arguments for running the fit
