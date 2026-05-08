@@ -936,7 +936,8 @@ class Entropy(Gp):
                 # must be instrument parameter
                 configurations = _fill_config(configurations, row.par, row.value, row.dataset, row.configuration)
 
-            if (row.type != 'n') and (row.dataset != '_') and ('b' not in row.dataset):
+            # '_' and '-' denote the same type and can be used interchangeably
+            if (row.type != 'n') and (row.dataset != '_') and (row.dataset != '-') and ('b' not in row.dataset):
                 # this is a parameter that will determine one or more isotropic backgrounds
                 if simvalue is None:
                     configurations = _set_background(configurations, row.dataset, row.configuration, row.value)
