@@ -297,7 +297,21 @@ class Entropy(Gp):
 
         # Data simulation parameters
         self.background_rule = background_rule
+
+        # configuration is a list of list (list over data files of list of configurations per file)
+        # here we catch a few alternative inputs providing no configuration, one configuration for all data files, or a
+        # list of configurations for all data files
+        # TODO: More elaborate check on matching on format of provided configurations vs. number of data files in run
+        #  script
+        if configuration is None:
+            configuration = [[{}]]
+        elif isinstance(configuration, dict):
+            configuration = [[configuration]]
+        elif isinstance(configuration, list):
+            if isinstance(configuration[0], dict):
+                configuration = [configuration]
         self.configuration = configuration
+
         self.qmin = qmin
         self.qmax = qmax
         self.qrangefromfile = qrangefromfile
@@ -897,8 +911,6 @@ class Entropy(Gp):
         # Configurations are imported externally, if not empty configuration initialization here
         # In any case, missing parameters are set to the default in the API simulation routines
         configurations = self.configuration
-        if configurations is None:
-            configurations = [[{}]]
 
         # cycle through all parameters
         isim = 0
