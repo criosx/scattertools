@@ -214,16 +214,26 @@ class Entropy(Gp):
         :param fitsource:               CMolStat fitsource
         :param storage_path:            CMolStat spath. This is where a prepared fit is provided.
         :param runfile:                 CMolStat runfile
-        :param mcmcburn:
-        :param mcmcsteps:
-        :param deldir:
+        :param mcmcburn:                (int) Number of burn steps during a MCMC optimization (if such is selected).
+        :param mcmcsteps:               (int) Number of production steps during a MCMC optimization.
+        :param deldir:                  (bool) Whether to remove large files from the fit directory of any iteration
+                                        after the fit and the results have been extracted. Is only queried if
+                                        remove_fit_dir is False.
         :param convergence:
         :param fitter:
-        :param remove_fit_dir:
+        :param remove_fit_dir:          (bool) whether to remove the entire fit directory of any iteration after the
+                                        fit and the results have been extracted. If False, see deldir for the option
+                                        to remove only large files
         :param lm_iterations:
-        :param mode:
-        :param background_rule:
-        :param configuration:
+        :param mode:                    (str) 'SANS_linear' or 'water' There are two modes for background calculation
+                                        implemented. One is a linear interpolation of the differential cross-section of
+                                        the background scattering based on a specified parameter or configuration value
+                                        in exp_par. For 'SANS_linear' a linear dependency on the value is defined with a
+                                        y-intercept and slope defined in background_rule (see below). For 'water', a
+                                        linear relationship cb = 0.9245 - 0.1348 * value is hardcoded.
+        :param background_rule:         (dict) with fields 'y_intercept' and 'slope' defining the linear relationship
+                                        for background determination (see mode, above)
+        :param configuration:           (list) List of configurations used to simulate the data
         :param qmin:
         :param qmax:
         :param qrangefromfile:
@@ -896,8 +906,8 @@ class Entropy(Gp):
             simvalue = None
             # is it a parameter to iterate over?
             if row.unique_name in self.steppar['unique_name'].tolist():
-                lsim = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'l_opt'].iloc[0]
-                stepsim = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'step_opt'].iloc[0]
+                # lsim = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'l_opt'].iloc[0]
+                # stepsim = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'step_opt'].iloc[0]
                 value = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'value'].iloc[0]
                 lfit = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'l_fit'].iloc[0]
                 ufit = self.steppar.loc[self.steppar['unique_name'] == row.unique_name, 'u_fit'].iloc[0]
