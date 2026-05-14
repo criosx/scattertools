@@ -911,9 +911,19 @@ class CMolStat:
         with open(sFileName, "wb") as file:
             pickle.dump(save_object, file)
 
-    def fnSimulateData(self, basefilename='sim.dat', liConfigurations=None, qmin=None, qmax=None, qrangefromfile=False,
-                       t_total=None, mode='water', lambda_min=0.1, verbose=True, simpar=None, save_file=True,
-                       average=False):
+    def fnSimulateData(self,
+                       basefilename: str='sim.dat',
+                       liConfigurations=None,
+                       qmin=None,
+                       qmax=None,
+                       qrangefromfile:bool=False,
+                       t_total=None,
+                       mode:str='water',
+                       lambda_min:float=0.1,
+                       verbose:bool=True,
+                       simpar=None,
+                       save_file:bool=True,
+                       average:bool=False):
         """
         Simulates scattering based on a parameter file called simpar.dat
         requires a ready-to-go fit whose fit parameters are modified and fixed
@@ -951,6 +961,15 @@ class CMolStat:
                                                              qmax=qmax, qrangefromfile=qrangefromfile,
                                                              lambda_min=lambda_min, mode=mode, t_total=t_total,
                                                              average=average)
+        check_array = numpy.array(liData, dtype=float)
+        if numpy.isnan(check_array).any():
+            print('Simulated Data:')
+            print(liData)
+            print('Model Parameters:')
+            print(diModelPars)
+            print('Simulation Parameters:')
+            print(simpar)
+            raise ValueError('Simulated Data contained NaN. Check your simulation parameters and model script.')
 
         # always save the file since it has been modified in place before
         # TODO: one could make this more consistent and remove save_file from function signature
