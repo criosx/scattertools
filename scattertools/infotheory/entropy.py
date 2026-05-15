@@ -976,6 +976,12 @@ class Entropy(Gp):
 
 
     def prepare_fit(self, position, itlabel: int):
+        """
+        Prepares, run and analzyes a fit for a given optimization position.
+        :param position: (list) optimization position
+        :param itlabel: (int) index of iteration label
+        :return: (list) marginal average gmm entropy, success (True or False).
+        """
 
         dirname = 'iteration_' + str(itlabel)
         fulldirname = self.storage_path / dirname

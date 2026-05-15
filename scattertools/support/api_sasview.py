@@ -90,6 +90,8 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
         Load all data files with the basefilenam filename into a list of Pandas dataframes.
         Each list element is itself a list of [comments, simdata]. It will load n files with the name
         basestem{i}.basesuffix, whereby 'i' is an index from 0 to n-1.
+
+        :return: list of lists of (comment, Pandas dataframe)
         """
         def _load(stem, suffix):
             # https://github.com/sansigormacros/ncnrsansigormacros/wiki/NCNROutput1D_IQ

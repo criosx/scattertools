@@ -1,6 +1,8 @@
 from __future__ import print_function
 from math import sqrt
 from os import path
+
+import pandas as pd
 from scipy import stats, special
 import matplotlib.pyplot as plt
 import numpy
@@ -961,15 +963,23 @@ class CMolStat:
                                                              qmax=qmax, qrangefromfile=qrangefromfile,
                                                              lambda_min=lambda_min, mode=mode, t_total=t_total,
                                                              average=average)
-        check_array = numpy.array(liData, dtype=float)
-        if numpy.isnan(check_array).any():
-            print('Simulated Data:')
-            print(liData)
-            print('Model Parameters:')
-            print(diModelPars)
-            print('Simulation Parameters:')
-            print(simpar)
-            raise ValueError('Simulated Data contained NaN. Check your simulation parameters and model script.')
+
+        # Roughly validate the simulated data. NaNs in the intensity row indicate a problem with the model calculation
+        # such as an invalid parameter leading to division by zero or similar. Empty dataframes indicate that no data
+        # was simulated within the requested q-range, for example due to an incompatible configuration with the q-range.
+        for dataset in liData:
+            _comments, df = dataset
+            if df["I"].isna().any():
+                print('Simulated Data:')
+                print(df)
+                print('Model Parameters:')
+                print(diModelPars)
+                print('Simulation Parameters:')
+                print(simpar)
+                raise ValueError('Simulated data contained NaN. Check your simulation parameters and model script.')
+            elif df.empty:
+                raise ValueError('Simulated data is empty. Check the compatibility of your q-range and instrument '
+                                 'configurations.')
 
         # always save the file since it has been modified in place before
         # TODO: one could make this more consistent and remove save_file from function signature
