@@ -347,6 +347,10 @@ class Entropy(Gp):
             self.allpar = pandas.read_csv(filepath, sep='\s+', header=None, names=header_names,  skip_blank_lines=True,
                                           comment='#')
 
+        # Experience-based validity check: remove any rows that are identical. That can happen if, e.g., shared
+        # configuration parameters are not removed after the first occurence in the exp_par input
+        self.allpar = self.allpar.drop_duplicates()
+
         # define unique names, since instrument parameters might have the same name for different datasets and
         # configurations
         self.allpar['unique_name'] = ''
