@@ -356,8 +356,8 @@ class CBumpsAPI(api_base.CBaseAPI):
         else:
             return None, None, None
 
-    def fnRunMCMC(self, burn=8000, steps=500, batch=False, fitter='MCMC', reload_problem=True, resume=False,
-                  alpha=0.01):
+    def fnRunMCMC(self, burn:int=8000, steps:int=500, batch:bool=False, fitter:str='MCMC', reload_problem:bool=True,
+                  resume:bool=False, alpha: float=0.01):
         """
         Runs fit for Bumps object.
 
@@ -402,6 +402,9 @@ class CBumpsAPI(api_base.CBaseAPI):
             x, fx = driver.fit(resume=os.path.join(mcmcpath, self.runfile))
         else:
             x, fx = driver.fit()
+            
+        if fitter == 'LM':
+            self.cov = driver.fitter.cov()
 
         # try to deal with matplotlib memory leaks
         matplotlib.interactive(False)

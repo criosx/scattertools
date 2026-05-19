@@ -14,6 +14,8 @@ class CBaseAPI:
         self.runfile = runfile
         self.diParameters = {}
 
+        self.cov=None
+
     def fnBackup(self):
         raise NotImplementedError()
 

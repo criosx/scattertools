@@ -592,6 +592,9 @@ class CMolStat:
     def fnGetChiSq(self):  # export chi squared
         return self.chisq
 
+    def fnGetCov(self):
+        return self.Interactor.cov
+
     def fnGetParameterValue(self, sname):  # export absolute parameter value
         return self.diParameters[sname]['value']  # for given name
 
