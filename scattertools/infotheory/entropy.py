@@ -483,7 +483,7 @@ class Entropy(Gp):
             gmm_entropy_marginal = mvn_entropy_marginal = mvnentropy.marginal_entropy(independent_pars=independent_pars)
 
             points_median = molstat.Interactor.problem.getp()
-            points_std = molstat.Interactor.problem.stderr()[0]
+            points_std = molstat.fnGetStdErr()   #[0]
         else:
             # MCMC fit
             if molstat is None:
