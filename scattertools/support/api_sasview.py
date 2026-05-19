@@ -412,11 +412,11 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
                     actual_total_time += configuration['time']
 
             # adjust measurement times if t_total is set
-            if t_total is not None:
-                if actual_total_time > 0:
+            if t_total is not None and t_total > 0:
+                if actual_total_time != 0:
                     time_factor = float(t_total) / float(actual_total_time)
                 else:
-                    time_factor = 1
+                    time_factor = 0
                 for dataset_n in range(len(liData)):
                     for configuration in liConfigurations[dataset_n]:
                         configuration['time'] *= time_factor
