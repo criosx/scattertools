@@ -223,8 +223,8 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
         return liData
 
     @staticmethod
-    def fnSimulateErrorBars(simpar=None, liData=None, liConfigurations=None, percent_error=0.1, average=False,
-                            t_total=None):
+    def fnSimulateErrorBars(simpar=None, liData=None, liConfigurations=None, percent_error=0.1,
+                            average=False, t_total=None):
         """
         Calculates uncertainties on a dataset liData given a list of configurations.
 
@@ -413,10 +413,10 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
 
             # adjust measurement times if t_total is set
             if t_total is not None:
-                if actual_total_time != 0:
+                if actual_total_time > 0:
                     time_factor = float(t_total) / float(actual_total_time)
                 else:
-                    time_factor = 0
+                    time_factor = 1
                 for dataset_n in range(len(liData)):
                     for configuration in liConfigurations[dataset_n]:
                         configuration['time'] *= time_factor
