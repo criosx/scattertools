@@ -478,7 +478,7 @@ class Entropy(Gp):
             parnames_dict_keys = molstat.Interactor.problem.labels()
             independent_pars, dependent_pars, parnames = _init_pars(parnames_dict_keys)
 
-            mvnentropy = MVN.MVNEntropy(cov=molstat.Interactor.problem.cov())
+            mvnentropy = MVN.MVNEntropy(cov=molstat.fnGetCov())
             gmm_entropy = mvn_entropy = mvnentropy.entropy()
             gmm_entropy_marginal = mvn_entropy_marginal = mvnentropy.marginal_entropy(independent_pars=independent_pars)
 
