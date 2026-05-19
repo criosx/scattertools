@@ -402,9 +402,10 @@ class CBumpsAPI(api_base.CBaseAPI):
             x, fx = driver.fit(resume=os.path.join(mcmcpath, self.runfile))
         else:
             x, fx = driver.fit()
-            
+
+        # save covariance matrix for LM fit
         if fitter == 'LM':
-            self.cov = driver.fitter.cov()
+            self.cov = driver.cov()
 
         # try to deal with matplotlib memory leaks
         matplotlib.interactive(False)
