@@ -73,6 +73,9 @@ class CBumpsAPI(api_base.CBaseAPI):
         if load_state:
             self.state = self.fnRestoreState() if state is None else state
 
+        self.cov=None
+        self.stderr=None
+
     def fnBackup(self, origin=None, target=None):
         if origin is None:
             origin = Path(self.spath).expanduser().resolve()
@@ -406,6 +409,7 @@ class CBumpsAPI(api_base.CBaseAPI):
         # save covariance matrix for LM fit
         if fitter == 'LM':
             self.cov = driver.cov()
+            self.stderr = driver.stderr()
 
         # try to deal with matplotlib memory leaks
         matplotlib.interactive(False)

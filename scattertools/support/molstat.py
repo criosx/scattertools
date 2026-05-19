@@ -611,6 +611,9 @@ class CMolStat:
             lvalue.append(str(self.diParameters[parameter]['value']))
         return lvalue
 
+    def fnGetStdErr(self):
+        return self.Interactor.stderr
+
     def fnLoadAndPrintPar(self, sPath='./'):
         self.fnLoadParameters()
         self.fnLoadCovar(sPath)
