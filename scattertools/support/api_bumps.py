@@ -1,5 +1,6 @@
 from __future__ import print_function
 from os import path
+from pathlib import Path
 from random import seed, random
 from re import VERBOSE, IGNORECASE, compile
 from sys import stdout
@@ -72,19 +73,24 @@ class CBumpsAPI(api_base.CBaseAPI):
         if load_state:
             self.state = self.fnRestoreState() if state is None else state
 
+        self.cov=None
+        self.stderr=None
+
     def fnBackup(self, origin=None, target=None):
         if origin is None:
-            origin = self.spath
+            origin = Path(self.spath).expanduser().resolve()
+        else:
+            origin = Path(origin).expanduser().resolve()
         if target is None:
-            target = self.spath + '/rsbackup'
-        if not path.isdir(target):
-            os.mkdir(target)
-        for file in glob.glob(origin + r'/*.dat'):
-            shutil.copy(file, target)
-        for file in glob.glob(origin + r'/*.py'):
-            shutil.copy(file, target)
-        for file in glob.glob(origin + r'/*.pyc'):
-            shutil.copy(file, target)
+            target = (Path(self.spath).expanduser().resolve()) / 'rsbackup'
+        else:
+            target = Path(target).expanduser().resolve()
+
+        target.mkdir(parents=True, exist_ok=True)
+
+        for pattern in ('*.dat', '*.py', '*.pyc'):
+            for file in origin.glob(pattern):
+                shutil.copy(file, target)
 
     def fnGetAllParameterNames(self, model: int = 0):
         """
@@ -353,8 +359,8 @@ class CBumpsAPI(api_base.CBaseAPI):
         else:
             return None, None, None
 
-    def fnRunMCMC(self, burn=8000, steps=500, batch=False, fitter='MCMC', reload_problem=True, resume=False,
-                  alpha=0.01):
+    def fnRunMCMC(self, burn:int=8000, steps:int=500, batch:bool=False, fitter:str='MCMC', reload_problem:bool=True,
+                  resume:bool=False, alpha: float=0.01):
         """
         Runs fit for Bumps object.
 
@@ -399,6 +405,11 @@ class CBumpsAPI(api_base.CBaseAPI):
             x, fx = driver.fit(resume=os.path.join(mcmcpath, self.runfile))
         else:
             x, fx = driver.fit()
+
+        # save covariance matrix for LM fit
+        if fitter == 'LM':
+            self.cov = driver.cov()
+            self.stderr = driver.stderr()
 
         # try to deal with matplotlib memory leaks
         matplotlib.interactive(False)

@@ -1,6 +1,8 @@
 from __future__ import print_function
 from math import sqrt
 from os import path
+
+import pandas as pd
 from scipy import stats, special
 import matplotlib.pyplot as plt
 import numpy
@@ -37,9 +39,15 @@ def prepare_fit_directory(fitdir=None, runfile=None, datafile_names=None):
 
 
 class CMolStat:
-    def __init__(self, fitsource="refl1d", spath=".", mcmcpath=".",
-                 runfile="run", state=None, problem=None,
-                 load_state=True, save_stat_data=False):
+    def __init__(self,
+                 fitsource="refl1d",
+                 spath=".",
+                 mcmcpath=".",
+                 runfile="run",
+                 state=None,
+                 problem=None,
+                 load_state=True,
+                 save_stat_data=False):
         """
         self.diParameters is a dictionary containing all parameters. Structure:
 
@@ -101,7 +109,6 @@ class CMolStat:
         self.fMolgroupsNormArea = 0
         # check for system and type of setup file
 
-        self.Interactor = None
         if self.fitsource == "bumps":
             from scattertools.support import api_bumps
             self.Interactor = api_bumps.CBumpsAPI(self.spath, self.mcmcpath, self.runfile, state, problem,
@@ -112,9 +119,11 @@ class CMolStat:
         elif self.fitsource == 'garefl':
             from scattertools.support import api_garefl
             self.Interactor = api_garefl.CGaReflAPI(self.spath, self.mcmcpath, self.runfile, load_state=load_state)
-        elif self.fitsource == 'SASView':
+        elif self.fitsource == 'SASView' or self.fitsource == 'sasview':
             from scattertools.support import api_sasview
             self.Interactor = api_sasview.CSASViewAPI(self.spath, self.mcmcpath, self.runfile, load_state=load_state)
+        else:
+            raise RuntimeError(f"Unknown fitsource : {self.fitsource}")
 
         # mirror problem attribute in the top-level object for convenience
         self.problem = self.Interactor.problem
@@ -583,6 +592,9 @@ class CMolStat:
     def fnGetChiSq(self):  # export chi squared
         return self.chisq
 
+    def fnGetCov(self):
+        return self.Interactor.cov
+
     def fnGetParameterValue(self, sname):  # export absolute parameter value
         return self.diParameters[sname]['value']  # for given name
 
@@ -598,6 +610,9 @@ class CMolStat:
         for parameter in litest:
             lvalue.append(str(self.diParameters[parameter]['value']))
         return lvalue
+
+    def fnGetStdErr(self):
+        return self.Interactor.stderr
 
     def fnLoadAndPrintPar(self, sPath='./'):
         self.fnLoadParameters()
@@ -904,9 +919,19 @@ class CMolStat:
         with open(sFileName, "wb") as file:
             pickle.dump(save_object, file)
 
-    def fnSimulateData(self, basefilename='sim.dat', liConfigurations=None, qmin=None, qmax=None, qrangefromfile=False,
-                       t_total=None, mode='water', lambda_min=0.1, verbose=True, simpar=None, save_file=True,
-                       average=False):
+    def fnSimulateData(self,
+                       basefilename: str='sim.dat',
+                       liConfigurations=None,
+                       qmin=None,
+                       qmax=None,
+                       qrangefromfile:bool=False,
+                       t_total=None,
+                       mode:str='water',
+                       lambda_min:float=0.1,
+                       verbose:bool=True,
+                       simpar=None,
+                       save_file:bool=True,
+                       average:bool=False):
         """
         Simulates scattering based on a parameter file called simpar.dat
         requires a ready-to-go fit whose fit parameters are modified and fixed
@@ -944,6 +969,23 @@ class CMolStat:
                                                              qmax=qmax, qrangefromfile=qrangefromfile,
                                                              lambda_min=lambda_min, mode=mode, t_total=t_total,
                                                              average=average)
+
+        # Roughly validate the simulated data. NaNs in the intensity row indicate a problem with the model calculation
+        # such as an invalid parameter leading to division by zero or similar. Empty dataframes indicate that no data
+        # was simulated within the requested q-range, for example due to an incompatible configuration with the q-range.
+        for dataset in liData:
+            _comments, df = dataset
+            if df["I"].isna().any():
+                print('Simulated Data:')
+                print(df)
+                print('Model Parameters:')
+                print(diModelPars)
+                print('Simulation Parameters:')
+                print(simpar)
+                raise ValueError('Simulated data contained NaN. Check your simulation parameters and model script.')
+            elif df.empty:
+                raise ValueError('Simulated data is empty. Check the compatibility of your q-range and instrument '
+                                 'configurations.')
 
         # always save the file since it has been modified in place before
         # TODO: one could make this more consistent and remove save_file from function signature

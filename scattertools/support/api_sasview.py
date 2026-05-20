@@ -90,6 +90,8 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
         Load all data files with the basefilenam filename into a list of Pandas dataframes.
         Each list element is itself a list of [comments, simdata]. It will load n files with the name
         basestem{i}.basesuffix, whereby 'i' is an index from 0 to n-1.
+
+        :return: list of lists of (comment, Pandas dataframe)
         """
         def _load(stem, suffix):
             # https://github.com/sansigormacros/ncnrsansigormacros/wiki/NCNROutput1D_IQ
@@ -221,8 +223,8 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
         return liData
 
     @staticmethod
-    def fnSimulateErrorBars(simpar=None, liData=None, liConfigurations=None, percent_error=0.1, average=False,
-                            t_total=None):
+    def fnSimulateErrorBars(simpar=None, liData=None, liConfigurations=None, percent_error=0.1,
+                            average=False, t_total=None):
         """
         Calculates uncertainties on a dataset liData given a list of configurations.
 
@@ -410,7 +412,7 @@ class CSASViewAPI(api_bumps.CBumpsAPI):
                     actual_total_time += configuration['time']
 
             # adjust measurement times if t_total is set
-            if t_total is not None:
+            if t_total is not None and t_total > 0:
                 if actual_total_time != 0:
                     time_factor = float(t_total) / float(actual_total_time)
                 else:
