@@ -959,7 +959,7 @@ class CMolStat:
 
         diModelPars = {}
         for parameter in liParameters:
-            diModelPars[parameter] = simpar[simpar.par == parameter].iloc[0][1]
+            diModelPars[parameter] = simpar.loc[simpar.par == parameter, 'value'].iloc[0]
         # load all data files into a list of Pandas dataframes
         # each element is itself a list of [comments, simdata]
         liData = self.Interactor.fnLoadData(basefilename)

@@ -43,4 +43,4 @@ model1.radius_pd=model0.radius_pd
 M0 = Experiment(data=data0, model=model0)
 M1 = Experiment(data=data1, model=model1)
 
-problem = MultiFitProblem([M0, M1])
+problem = FitProblem([M0, M1])
