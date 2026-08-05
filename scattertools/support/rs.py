@@ -452,12 +452,16 @@ def fMCMC(iMaxIterations=1024000, liMolgroups=['protein'], fSparse=0):
     # Bumps V0: --store=new --resume=old
     # Bumps V1: --write-session=new.h5 --export=new --read-session=old.h5 --resume
     try:
+        from bumps.cli import BumpsOptions
+        bumps_version = 1
+    except ImportError:
         from bumps.webview.server.cli import BumpsOptions
         bumps_version = 1
-        # Note: renamed --*store to --*session around bumps 1.0.4
-        session = "session" if hasattr(BumpsOptions, 'session') else "store"
     except ImportError:
+        BumpsOptions = None
         bumps_version = 0
+    # Note: renamed --*store to --*session around bumps 1.0.4
+    session = "session" if hasattr(BumpsOptions, 'session') else "store"
 
     while True:
         if not path.isfile('run.py'):  # make sure there is a run.py
